@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Jobs AI Auto Apply",
+  "version": "2.0.0",
+  "description": "Automate & autofill job applications with AI",
+  "icons": {
+    "16": "1616.png",
+    "48": "4848.png",
+    "128": "128128.png"
+  },
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://qerds.com/*",
+    "https://*.linkedin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Auto Apply Settings",
+    "default_icon": {
+      "16": "1616.png",
+      "48": "4848.png",
+      "128": "128128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.linkedin.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "options_ui": {
+    "page": "settings.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/compressed_resume.yaml"],
+      "matches": ["https://*.linkedin.com/*"]
+    }
+  ]
+}
