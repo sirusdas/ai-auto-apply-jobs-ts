@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Accordion from './Accordion';
 
 interface PersonalInfo {
   YearsOfExperience: string;
@@ -48,74 +49,79 @@ const PersonalInfoSettings: React.FC = () => {
 
   return (
     <div className="personal-info-settings">
-      <h3>Personal Information</h3>
-      <p>Fill in your basic information. This will be used as a fallback when using Free plan (AI disabled).</p>
+      <h2>Personal Information</h2>
       
-      <div className="form-group">
-        <label htmlFor="FirstName">First Name</label>
-        <input
-          type="text"
-          id="FirstName"
-          name="FirstName"
-          value={personalInfo.FirstName}
-          onChange={handleChange}
-        />
-      </div>
+      <Accordion title="Basic Information" defaultOpen={true}>
+        <p>Fill in your basic information. This will be used as a fallback when using Free plan (AI disabled).</p>
+        
+        <div className="form-group">
+          <label htmlFor="FirstName">First Name</label>
+          <input
+            type="text"
+            id="FirstName"
+            name="FirstName"
+            value={personalInfo.FirstName}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="LastName">Last Name</label>
+          <input
+            type="text"
+            id="LastName"
+            name="LastName"
+            value={personalInfo.LastName}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="Email">Email</label>
+          <input
+            type="email"
+            id="Email"
+            name="Email"
+            value={personalInfo.Email}
+            onChange={handleChange}
+          />
+        </div>
+      </Accordion>
       
-      <div className="form-group">
-        <label htmlFor="LastName">Last Name</label>
-        <input
-          type="text"
-          id="LastName"
-          name="LastName"
-          value={personalInfo.LastName}
-          onChange={handleChange}
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="Email">Email</label>
-        <input
-          type="email"
-          id="Email"
-          name="Email"
-          value={personalInfo.Email}
-          onChange={handleChange}
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="PhoneNumber">Phone Number</label>
-        <input
-          type="tel"
-          id="PhoneNumber"
-          name="PhoneNumber"
-          value={personalInfo.PhoneNumber}
-          onChange={handleChange}
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="City">City</label>
-        <input
-          type="text"
-          id="City"
-          name="City"
-          value={personalInfo.City}
-          onChange={handleChange}
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="YearsOfExperience">Years of Experience</label>
-        <input
-          type="text"
-          id="YearsOfExperience"
-          name="YearsOfExperience"
-          value={personalInfo.YearsOfExperience}
-          onChange={handleChange}
-        />
-      </div>
+      <Accordion title="Contact Details">
+        <div className="form-group">
+          <label htmlFor="PhoneNumber">Phone Number</label>
+          <input
+            type="tel"
+            id="PhoneNumber"
+            name="PhoneNumber"
+            value={personalInfo.PhoneNumber}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="City">City</label>
+          <input
+            type="text"
+            id="City"
+            name="City"
+            value={personalInfo.City}
+            onChange={handleChange}
+          />
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="YearsOfExperience">Years of Experience</label>
+          <input
+            type="text"
+            id="YearsOfExperience"
+            name="YearsOfExperience"
+            value={personalInfo.YearsOfExperience}
+            onChange={handleChange}
+          />
+        </div>
+      </Accordion>
       
       <button 
         onClick={handleSave} 

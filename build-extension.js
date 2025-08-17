@@ -105,6 +105,14 @@ if (fs.existsSync(sharedSrc)) {
   console.log('Copied shared.js to dist folder');
 }
 
+// Copy settings-accordion.js if it exists in the root directory
+const settingsAccordionSrc = path.join(__dirname, 'settings-accordion.js');
+const settingsAccordionDest = path.join(distDir, 'settings-accordion.js');
+if (fs.existsSync(settingsAccordionSrc)) {
+  fs.copyFileSync(settingsAccordionSrc, settingsAccordionDest);
+  console.log('Copied settings-accordion.js to dist folder');
+}
+
 // Copy CSS files from assets
 const assetsCssSrc = path.join(__dirname, 'src', 'assets', 'styles');
 const distAssetsCss = path.join(distDir, 'assets', 'styles');

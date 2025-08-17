@@ -53,8 +53,344 @@
 }
 
 .accordion-content.open {
-  max-height: 1000px;
+  max-height: none; /* Allow accordion to take as much space as needed */
   padding: 20px;
+}
+
+/* Styles for the accordions in SearchTimerConfig component */
+.search-timer-config .accordion {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.search-timer-config .accordion h3 {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  background-color: #e9ecef;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.search-timer-config .accordion h3:hover {
+  background-color: #dee2e6;
+}
+
+.search-timer-config .accordion .panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  padding: 0 1.25rem;
+}
+
+.search-timer-config .accordion .panel.open {
+  max-height: none; /* Allow panel to take as much space as needed */
+  padding: 1.25rem;
+}
+
+.search-timer-config .accordion.active h3 {
+  background-color: #0077b5;
+  color: white;
+  border-bottom-color: #0077b5;
+}
+
+/* Form group styles */
+.search-timer-config .form-group,
+.form-control-configurations .form-group {
+  margin-bottom: 1rem;
+}
+
+.search-timer-config .form-group label,
+.form-control-configurations .form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.search-timer-config .form-group input,
+.form-control-configurations .form-group input,
+.form-control-configurations .form-group select {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.search-timer-config .form-group input:focus,
+.form-control-configurations .form-group input:focus,
+.form-control-configurations .form-group select:focus {
+  color: #495057;
+  background-color: #fff;
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Side by side form groups for location and job type fields */
+.search-timer-config .location .form-group.pair,
+.search-timer-config .jobType .form-group.pair {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-timer-config .location .form-group.pair > .form-group,
+.search-timer-config .jobType .form-group.pair > .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* Side by side locations with 36% width */
+.search-timer-config .locations-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2%;
+}
+
+.search-timer-config .location {
+  flex: 0 0 49%;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+}
+
+.search-timer-config .location .btn-danger {
+  margin-top: 0.5rem;
+}
+
+/* Button styles */
+.search-timer-config .btn,
+.form-control-configurations .btn {
+  display: inline-block;
+  font-weight: 400;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 0.25rem;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, 
+              border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.search-timer-config .btn:focus,
+.form-control-configurations .btn:focus {
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.search-timer-config .btn:hover,
+.form-control-configurations .btn:hover {
+  opacity: 0.85;
+}
+
+.search-timer-config .btn-primary,
+.form-control-configurations .btn-primary {
+  color: #fff;
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+.search-timer-config .btn-primary:hover,
+.form-control-configurations .btn-primary:hover {
+  color: #fff;
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+.search-timer-config .btn-danger,
+.form-control-configurations .btn-danger {
+  color: #fff;
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.search-timer-config .btn-danger:hover,
+.form-control-configurations .btn-danger:hover {
+  color: #fff;
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.search-timer-config .btn-secondary,
+.form-control-configurations .btn-secondary {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.search-timer-config .btn-secondary:hover,
+.form-control-configurations .btn-secondary:hover {
+  color: #fff;
+  background-color: #5a6268;
+  border-color: #545b62;
+}
+
+.search-timer-config .btn-small,
+.form-control-configurations .btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Button alignment and spacing */
+.search-timer-config .jobType {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-timer-config .jobType .btn-danger {
+  margin-top: 0.5rem;
+}
+
+.search-timer-config .jobConfig > .btn-danger {
+  margin-top: 1rem;
+}
+
+/* Improved spacing for job configurations */
+.search-timer-config .job {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.search-timer-config .jobConfig {
+  margin-bottom: 1rem;
+}
+
+/* Add spacing between accordion sections */
+.search-timer-config .jobConfig > .accordion {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Add spacing before the final "Remove Job Config" button */
+.search-timer-config .jobConfig > .form-group:nth-last-child(2) {
+  margin-bottom: 1.5rem;
+}
+
+/* Add spacing after the "Add Job Config" button */
+.search-timer-config > .btn.btn-primary {
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* Form Control Configurations specific styles */
+.form-control-configurations .control-section {
+  padding: 1rem 0;
+}
+
+.form-control-configurations .control-item {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-control-configurations .control-item:last-child {
+  margin-bottom: 0;
+}
+
+.form-control-configurations .options-container {
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-control-configurations .option-item {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-control-configurations .option-item:last-child {
+  margin-bottom: 0;
+}
+
+.form-control-configurations .option-input {
+  flex: 1;
+}
+
+.form-control-configurations .control-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.form-control-configurations .section-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.form-control-configurations .form-actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.form-control-configurations .btn-large {
+  padding: 0.5rem 1.5rem;
+  font-size: 1.1rem;
+}
+
+/* JSON editor styles */
+#jobsJsonEditor textarea {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+#jobsJsonEditor .btn {
+  margin-right: 10px;
+}
+
+#jobsJsonEditor .btn:last-child {
+  margin-right: 0;
+}
+
+/* Toast message styles */
+#toast-message,
+.toast-message {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #28a745;
+  color: white;
+  padding: 15px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  z-index: 1000;
+  max-width: 400px;
+}
+
+#toast-message.error,
+.toast-message.error {
+  background-color: #dc3545;
 }
 
 /* Responsive styles */
@@ -66,6 +402,65 @@
   
   .accordion-content.open {
     padding: 15px;
+  }
+  
+  .search-timer-config .accordion h3 {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .search-timer-config .accordion .panel.open {
+    padding: 1rem;
+  }
+  
+  .search-timer-config .form-group input,
+  .form-control-configurations .form-group input,
+  .form-control-configurations .form-group select {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .search-timer-config .btn,
+  .form-control-configurations .btn {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .search-timer-config .job {
+    padding: 1rem;
+  }
+  
+  .form-control-configurations .control-item {
+    padding: 1rem;
+  }
+  
+  .form-control-configurations .option-item {
+    flex-direction: column;
+  }
+  
+  /* Stack side-by-side elements on small screens */
+  .search-timer-config .location .form-group.pair,
+  .search-timer-config .jobType .form-group.pair {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  /* Stack locations vertically on small screens */
+  .search-timer-config .locations-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .search-timer-config .location {
+    flex: 0 0 100%;
+  }
+  
+  #toast-message,
+  .toast-message {
+    max-width: 300px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
   }
 }
 
@@ -92,3 +487,88 @@ body.dark-mode .accordion-content {
   background-color: #2c3e50;
   color: #ecf0f1;
 }
+
+body.dark-mode .search-timer-config .accordion {
+  background-color: #2c3e50;
+  border-color: #34495e;
+  color: #ecf0f1;
+}
+
+body.dark-mode .search-timer-config .accordion h3 {
+  background-color: #34495e;
+  color: #ecf0f1;
+  border-bottom-color: #34495e;
+}
+
+body.dark-mode .search-timer-config .accordion h3:hover {
+  background-color: #2c3e50;
+}
+
+body.dark-mode .search-timer-config .accordion.active h3 {
+  background-color: #0077b5;
+}
+
+body.dark-mode .search-timer-config .accordion .panel {
+  background-color: #2c3e50;
+  color: #ecf0f1;
+}
+
+body.dark-mode .search-timer-config .form-group label,
+body.dark-mode .form-control-configurations .form-group label {
+  color: #ecf0f1;
+}
+
+body.dark-mode .search-timer-config .form-group input,
+body.dark-mode .form-control-configurations .form-group input,
+body.dark-mode .form-control-configurations .form-group select {
+  color: #ecf0f1;
+  background-color: #34495e;
+  border-color: #4a5f7a;
+}
+
+body.dark-mode .search-timer-config .form-group input:focus,
+body.dark-mode .form-control-configurations .form-group input:focus,
+body.dark-mode .form-control-configurations .form-group select:focus {
+  color: #ecf0f1;
+  background-color: #34495e;
+  border-color: #0077b5;
+  box-shadow: 0 0 0 0.2rem rgba(0, 119, 181, 0.25);
+}
+
+body.dark-mode .search-timer-config .location,
+body.dark-mode .search-timer-config .jobType {
+  background-color: #34495e;
+  border-color: #4a5f7a;
+}
+
+body.dark-mode .search-timer-config .job {
+  background-color: #2c3e50;
+  border-color: #34495e;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.2);
+}
+
+body.dark-mode .form-control-configurations .control-item {
+  background-color: #2c3e50;
+  border-color: #34495e;
+}
+
+body.dark-mode .form-control-configurations .options-container {
+  background-color: #34495e;
+  border-color: #4a5f7a;
+}
+
+body.dark-mode #toast-message,
+body.dark-mode .toast-message {
+  background-color: #28a745;
+  color: white;
+}
+
+body.dark-mode #toast-message.error,
+body.dark-mode .toast-message.error {
+  background-color: #dc3545;
+}
+
+/* Settings-specific styles that aren't in popup.css */
+/* These styles complement the main popup.css styles */
+
+/* Additional styles for the settings page can be added here if needed */

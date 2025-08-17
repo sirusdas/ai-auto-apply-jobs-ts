@@ -20,6 +20,7 @@ const SearchTimerConfig: React.FC = () => {
   
   const jsonEditorRef = useRef<HTMLDivElement>(null);
   const jsonEditorInstance = useRef<any>(null);
+  const [isJsonEditing, setIsJsonEditing] = useState(false);
 
   useEffect(() => {
     // Load saved job configurations
@@ -57,7 +58,7 @@ const SearchTimerConfig: React.FC = () => {
           jsonEditorInstance.current.destroy();
         }
         
-        // Create a simple textarea-based JSON editor for now
+        // Create a simple textarea-based JSON editor
         jsonEditorRef.current.innerHTML = '';
         const textarea = document.createElement('textarea');
         textarea.value = JSON.stringify(jobConfigs, null, 2);
@@ -69,13 +70,93 @@ const SearchTimerConfig: React.FC = () => {
         textarea.style.border = '1px solid #ddd';
         textarea.style.borderRadius = '4px';
         textarea.style.backgroundColor = '#f8f9fa';
-        textarea.readOnly = true;
+        textarea.readOnly = !isJsonEditing; // Make editable when in editing mode
         jsonEditorRef.current.appendChild(textarea);
+        
+        // Add button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.marginTop = '10px';
+        
+        if (!isJsonEditing) {
+          const editButton = document.createElement('button');
+          editButton.textContent = 'Edit JSON';
+          editButton.className = 'btn btn-secondary';
+          editButton.type = 'button';
+          editButton.onclick = () => setIsJsonEditing(true);
+          buttonContainer.appendChild(editButton);
+        } else {
+          const saveButton = document.createElement('button');
+          saveButton.textContent = 'Save JSON';
+          saveButton.className = 'btn btn-primary';
+          saveButton.type = 'button';
+          saveButton.style.marginRight = '10px';
+          saveButton.onclick = handleJsonSave;
+          buttonContainer.appendChild(saveButton);
+          
+          const cancelButton = document.createElement('button');
+          cancelButton.textContent = 'Cancel';
+          cancelButton.className = 'btn btn-danger';
+          cancelButton.type = 'button';
+          cancelButton.onclick = () => setIsJsonEditing(false);
+          buttonContainer.appendChild(cancelButton);
+        }
+        
+        jsonEditorRef.current.appendChild(buttonContainer);
       } catch (e) {
         console.error('Error initializing JSON editor:', e);
       }
     }
-  }, [jobConfigs]);
+    
+    // Initialize accordions after the component is rendered
+    setTimeout(() => {
+      if (typeof (window as any).initSearchTimerAccordions === 'function') {
+        (window as any).initSearchTimerAccordions();
+      }
+    }, 0);
+  }, [jobConfigs, isJsonEditing]);
+
+  useEffect(() => {
+    // Initialize accordions when component mounts
+    if (typeof (window as any).initSearchTimerAccordions === 'function') {
+      (window as any).initSearchTimerAccordions();
+    }
+  }, []);
+
+  const handleJsonSave = () => {
+    if (jsonEditorRef.current) {
+      const textarea = jsonEditorRef.current.querySelector('textarea');
+      if (textarea) {
+        try {
+          const newJobConfigs = JSON.parse(textarea.value);
+          setJobConfigs(newJobConfigs);
+          setIsJsonEditing(false);
+          
+          // Show success message
+          const toast = document.getElementById('toast-message');
+          if (toast) {
+            toast.textContent = 'JSON updated successfully! Please save to apply changes.';
+            toast.style.display = 'block';
+            setTimeout(() => {
+              toast.style.display = 'none';
+            }, 3000);
+          }
+        } catch (e) {
+          // Show error message
+          const toast = document.getElementById('toast-message');
+          if (toast) {
+            toast.textContent = 'Invalid JSON format. Please check your input.';
+            toast.style.display = 'block';
+            toast.style.backgroundColor = '#dc3545';
+            setTimeout(() => {
+              toast.style.display = 'none';
+              toast.style.backgroundColor = '';
+            }, 5000);
+          }
+          console.error('Error parsing JSON:', e);
+        }
+      }
+    }
+  };
 
   const handleSave = () => {
     chrome.storage.local.set({ jobConfigs }, () => {
@@ -212,24 +293,26 @@ const SearchTimerConfig: React.FC = () => {
                     <div className="locations-container">
                       {jobConfig.locations.map((location, locationIndex) => (
                         <div key={location.id} className="location">
-                          <div className="form-group">
-                            <label>Location Name:</label>
-                            <input
-                              type="text"
-                              className="locationName"
-                              value={location.locationName}
-                              onChange={(e) => updateLocation(jobIndex, locationIndex, 'locationName', e.target.value)}
-                            />
-                          </div>
-                          
-                          <div className="form-group">
-                            <label>Location Timer:</label>
-                            <input
-                              type="text"
-                              className="locationTimer"
-                              value={location.locationTimer}
-                              onChange={(e) => updateLocation(jobIndex, locationIndex, 'locationTimer', e.target.value)}
-                            />
+                          <div className="form-group pair">
+                            <div className="form-group">
+                              <label>Location Name:</label>
+                              <input
+                                type="text"
+                                className="locationName"
+                                value={location.locationName}
+                                onChange={(e) => updateLocation(jobIndex, locationIndex, 'locationName', e.target.value)}
+                              />
+                            </div>
+                            
+                            <div className="form-group">
+                              <label>Location Timer:</label>
+                              <input
+                                type="text"
+                                className="locationTimer"
+                                value={location.locationTimer}
+                                onChange={(e) => updateLocation(jobIndex, locationIndex, 'locationTimer', e.target.value)}
+                              />
+                            </div>
                           </div>
                           
                           <button
@@ -258,24 +341,26 @@ const SearchTimerConfig: React.FC = () => {
                     <div className="job-types-container">
                       {jobConfig.jobTypes.map((jobType, typeIndex) => (
                         <div key={jobType.id} className="jobType">
-                          <div className="form-group">
-                            <label>Job Type:</label>
-                            <input
-                              type="text"
-                              className="jobTypeName"
-                              value={jobType.jobTypeName}
-                              onChange={(e) => updateJobType(jobIndex, typeIndex, 'jobTypeName', e.target.value)}
-                            />
-                          </div>
-                          
-                          <div className="form-group">
-                            <label>Job Type Timer:</label>
-                            <input
-                              type="text"
-                              className="jobTypeTimer"
-                              value={jobType.jobTypeTimer}
-                              onChange={(e) => updateJobType(jobIndex, typeIndex, 'jobTypeTimer', e.target.value)}
-                            />
+                          <div className="form-group pair">
+                            <div className="form-group">
+                              <label>Job Type:</label>
+                              <input
+                                type="text"
+                                className="jobTypeName"
+                                value={jobType.jobTypeName}
+                                onChange={(e) => updateJobType(jobIndex, typeIndex, 'jobTypeName', e.target.value)}
+                              />
+                            </div>
+                            
+                            <div className="form-group">
+                              <label>Job Type Timer:</label>
+                              <input
+                                type="text"
+                                className="jobTypeTimer"
+                                value={jobType.jobTypeTimer}
+                                onChange={(e) => updateJobType(jobIndex, typeIndex, 'jobTypeTimer', e.target.value)}
+                              />
+                            </div>
                           </div>
                           
                           <button
@@ -338,6 +423,20 @@ const SearchTimerConfig: React.FC = () => {
           Save Job Configs
         </button>
       </form>
+      
+      <div id="toast-message" style={{
+        display: 'none',
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        backgroundColor: '#28a745',
+        color: 'white',
+        padding: '15px',
+        borderRadius: '4px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        zIndex: 1000
+      }}>
+      </div>
     </div>
   );
 };
