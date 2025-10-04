@@ -30,7 +30,8 @@ export async function handleScriptTermination() {
         // Try to close any dialogs
         const dialogSelectors = [
             'button[data-test-dialog-primary-button]',
-            '.artdeco-dialog__dismiss'
+            '.artdeco-dialog__dismiss',
+            'button[data-control-name="discard_application_confirm_btn"]'
         ];
 
         for (const selector of dialogSelectors) {

@@ -283,6 +283,100 @@ export async function performCheckBoxFieldCityCheck() {
     }
 }
 
+// Function to handle mandatory checkboxes
+export async function handleMandatoryCheckboxes() {
+    try {
+        const mandatoryCheckboxes = document.querySelectorAll('input[type="checkbox"][aria-required="true"]');
+        mandatoryCheckboxes.forEach((checkbox) => {
+            const input = checkbox as HTMLInputElement;
+            if (!input.checked) {
+                input.checked = true;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    } catch (error) {
+        console.error('Error handling mandatory checkboxes:', error);
+    }
+}
+
+// Function to handle all checkboxes during data collection phase
+export async function handleAllCheckboxesForDataCollection() {
+    try {
+        console.log('Starting handleAllCheckboxesForDataCollection');
+        
+        // Find all unchecked checkboxes
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        console.log('Found unchecked checkboxes:', allCheckboxes.length);
+        
+        // Log details about each checkbox
+        allCheckboxes.forEach((checkbox, index) => {
+            console.log(`Checkbox ${index}:`, {
+                id: checkbox.id,
+                name: checkbox.name,
+                className: checkbox.className,
+                required: checkbox.required,
+                ariaRequired: checkbox.getAttribute('aria-required'),
+                checked: checkbox.checked,
+                parentElement: checkbox.parentElement?.tagName,
+                closestFieldset: checkbox.closest('fieldset')?.getAttribute('data-test-checkbox-form-component'),
+                closestFormElement: checkbox.closest('.fb-dash-form-element')?.className
+            });
+        });
+        
+        // Check all checkboxes during data collection phase
+        for (const checkbox of Array.from(allCheckboxes)) {
+            // Check if checkbox is in a fieldset marked as a checkbox form component
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            if (fieldset) {
+                console.log('Processing checkbox in fieldset');
+                // For fieldsets, we want to be more specific about which checkboxes to check
+                // Check if this is a required checkbox based on the fieldset structure
+                const requiredTitle = fieldset.querySelector('.fb-dash-form-element__label-title--is-required');
+                const requiredIndicator = fieldset.querySelector('[data-test-checkbox-form-required="true"]');
+                
+                console.log('Fieldset details:', {
+                    hasRequiredTitle: !!requiredTitle,
+                    hasRequiredIndicator: !!requiredIndicator,
+                    fieldsetId: fieldset.id,
+                    fieldsetAttributes: Array.from(fieldset.attributes).map(attr => `${attr.name}=${attr.value}`)
+                });
+                
+                // Always check checkboxes in fieldsets during data collection
+                console.log('Checking checkbox in fieldset during data collection:', checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            } else {
+                // For standalone checkboxes, check them all during data collection
+                console.log('Checking standalone checkbox during data collection:', checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            }
+        }
+        
+        // Log how many checkboxes were processed
+        if (allCheckboxes.length > 0) {
+            console.log('Checked all checkboxes for data collection:', allCheckboxes.length);
+        } else {
+            console.log('No unchecked checkboxes found');
+        }
+        
+        // After processing, let's check if there are any remaining unchecked checkboxes
+        const remainingUnchecked = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        console.log('Remaining unchecked checkboxes after processing:', remainingUnchecked.length);
+        remainingUnchecked.forEach((checkbox, index) => {
+            console.log(`Remaining checkbox ${index}:`, {
+                id: checkbox.id,
+                name: checkbox.name,
+                checked: checkbox.checked
+            });
+        });
+    } catch (error) {
+        console.error('Error checking all checkboxes for data collection:', error);
+    }
+}
+
 // Function to perform radio button checks
 export async function performRadioButtonChecks(prefillableData: any = {}) {
     let storedRadios: any[] = [];
@@ -421,6 +515,8 @@ export async function performDropdownChecks(prefillableData: any = {}) {
 
 // Function to run validations
 export async function runValidations(prefillableData: any = {}) {
+    console.log('Application runValidations: Starting with prefillableData:', prefillableData);
+    
     // Handle safety reminders first
     await performSafetyReminderCheck();
     
@@ -428,11 +524,15 @@ export async function runValidations(prefillableData: any = {}) {
     await performInputFieldChecks(prefillableData);
     await performInputFieldCityCheck();
     await performCheckBoxFieldCityCheck();
+    await handleMandatoryCheckboxes(); // Handle mandatory checkboxes
+    await handleAllCheckboxesForDataCollection(); // Check all checkboxes during data collection phase
     await performRadioButtonChecks(prefillableData);
     await performDropdownChecks(prefillableData);
     
     // Check for errors
     await checkForError();
+    
+    console.log('Application runValidations: Completed');
 }
 
 // Function to record job application
@@ -471,6 +571,14 @@ export async function recordJobApplication(jobTitle: string, companyName: string
     }
 }
 
+// Function to close application sent modal
+async function closeApplicationSentModal() {
+    const modal = document.querySelector('.artdeco-modal');
+    if (modal?.textContent?.includes('Application sent') && modal.textContent.includes('Your application was sent to')) {
+        modal.querySelector<HTMLElement>('.artdeco-modal__dismiss')?.click();
+    }
+}
+
 // Function to run apply model
 export async function runApplyModel(
     fetchingFieldValues = true,
@@ -484,146 +592,84 @@ export async function runApplyModel(
     }
 
     try {
-        console.log('Form fillup started...');
-        await addDelay(); // Do not remove this line
-
-        // Handle safety reminders
         await performSafetyReminderCheck();
+        await addDelay();
 
-        const buttons = document.querySelectorAll('button.jobs-apply-button.artdeco-button--primary');
-        let continueApplyingButton: HTMLElement | null = null;
-
-        buttons.forEach((button: Element) => {
-            if (!(button instanceof HTMLElement)) return;
+        const continueBtn = Array.from(document.querySelectorAll('button.jobs-apply-button.artdeco-button--primary'))
+            .find(b => b.querySelector('span.artdeco-button__text')?.textContent?.trim() === 'Continue applying') as HTMLButtonElement | undefined;
             
-            const span = button.querySelector('span.artdeco-button__text');
-            if (span && span.textContent?.trim() === 'Continue applying') {
-                continueApplyingButton = button;
-            }
-        });
-
-        if (continueApplyingButton) {
-            console.log('Continuing applying...');
-            await addShortDelay();
-            (continueApplyingButton as HTMLElement).click();
-            await addShortDelay();
-            // Recursively call runApplyModel to continue the process
-            await runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
-            return;
+        if (continueBtn) {
+            continueBtn.click();
+            return runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
         }
 
-        const nextButton = document.querySelector('button[data-easy-apply-next-button]');
-        const reviewButton = document.querySelector('button[aria-label="Review your application"]');
-        const submitButton = document.querySelector('button[aria-label="Submit application"]');
+        const nextBtn = document.querySelector<HTMLButtonElement>('button[data-easy-apply-next-button]');
+        const reviewBtn = document.querySelector<HTMLButtonElement>('button[aria-label="Review your application"]');
+        const submitBtn = document.querySelector<HTMLButtonElement>('button[aria-label="Submit application"]');
 
-        if (submitButton) {
-            console.log('Submitting application...');
+        if (submitBtn) {
             await addShortDelay();
             await uncheckFollowCompany();
             await addShortDelay();
-            
-            // Record the job application
-            const jobTitleElement = document.querySelector('a[data-control-name="job_card_title"]') as HTMLAnchorElement | null;
-            const companyNameElement = document.querySelector('span.job-card-container__company-name') as HTMLElement | null;
-            const jobUrl = window.location.href;
-            
-            const jobTitle = jobTitleElement ? jobTitleElement.textContent?.trim() : 'Unknown';
-            const companyName = companyNameElement ? companyNameElement.textContent?.trim() : 'Unknown';
-            
-            await recordJobApplication(jobTitle || 'Unknown', companyName || 'Unknown', jobUrl);
-            
-            console.log('Submitting application...');
-            (submitButton as HTMLElement).click();
-
+            submitBtn.click();
             await addDelay();
+            document.querySelector<HTMLElement>('.artdeco-modal__dismiss')?.click();
+            return;
+        }
 
-            const modalCloseButton = document.querySelector('.artdeco-modal__dismiss');
-            if (modalCloseButton instanceof HTMLElement) {
-                modalCloseButton.click();
-                return;
-            }
-        } else if (nextButton || reviewButton) {
+        if (nextBtn || reviewBtn) {
             if (fetchingFieldValues) {
-                const formQuestions = await navigateThroughEasyApply();
-                overallInputQuestions = [...overallInputQuestions, ...formQuestions.inputs];
-                overallRadioButtonQuestions = [...overallRadioButtonQuestions, ...formQuestions.radios];
-                overallDropdownQuestions = [...overallDropdownQuestions, ...formQuestions.dropdowns];
+                const [i, r, d] = await navigateThroughEasyApply();
+                overallInputQuestions.push(...i);
+                overallRadioButtonQuestions.push(...r);
+                overallDropdownQuestions.push(...d);
             }
 
-            if (reviewButton && fetchingFieldValues && Object.keys(prefillableData).length === 0) {
-                // Check if we are fetching field values
-                // Close the modal now and 
-                console.log("overallInputQuestions:", overallInputQuestions);
-                console.log("overallRadioButtonQuestions:", overallRadioButtonQuestions);
-                console.log("overallDropdownQuestions:", overallDropdownQuestions);
-                fetchingFieldValues = false;
-                await handleScriptTermination();
-
-                // Ask AI to process the data
+            if (reviewBtn && fetchingFieldValues && Object.keys(prefillableData).length === 0) {
+                await terminateJobModel();
                 const questions = [...overallInputQuestions, ...overallRadioButtonQuestions, ...overallDropdownQuestions];
                 const aiResponse = await processQuestionsAI(questions);
                 if (aiResponse) {
                     const { inputs, dropdowns, radios } = aiResponse;
                     prefillableData = { inputs, dropdowns, radios };
                 }
-
-                // Get ready to prefill
-                // Click easy apply again with prefillable data
-                // This would need to be implemented
+                return runFindEasyApply();
             }
 
-            console.log('Clicking next or review button...');
-            const buttonToClick = reviewButton || nextButton;
-
-            if (!fetchingFieldValues) {
-                await runValidations(prefillableData);
-            }
-
-            // Run validations to fill form fields
-            // await runValidations();
+            const btn = reviewBtn || nextBtn!;
+            if (!fetchingFieldValues) await runValidations(prefillableData);
 
             if (await checkForError()) {
                 await terminateJobModel();
                 await addShortDelay();
             } else {
                 await addDelay();
-                const progressBar = document.querySelector('.artdeco-completeness-meter-linear__progress-container progress');
+                const progressBar = document.querySelector<HTMLProgressElement>('.artdeco-completeness-meter-linear__progress-container progress');
                 if (!progressBar) {
                     await terminateJobModel();
                     return;
                 }
                 await addDelay();
-                (buttonToClick as HTMLElement).click();
-                await addDelay();
+                btn.click();
+                await closeApplicationSentModal();
+                await addShortDelay();
+                return runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
             }
-
-            // Add a recursive call to continue the process
-            await runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
         } else {
-            // Handle case where no buttons are found
-            const modalCloseButton = document.querySelector('.artdeco-modal__dismiss');
-            if (modalCloseButton instanceof HTMLElement) {
-                modalCloseButton.click();
-            }
+            document.querySelector<HTMLElement>('.artdeco-modal__dismiss')?.click();
         }
-    } catch (error) {
-        console.error('Error in runApplyModel:', error);
+    } catch (e) {
+        console.error('Error in runApplyModel:', e);
     }
 }
 
 // Function to navigate through easy apply
 export async function navigateThroughEasyApply() {
     await validateAndCloseConfirmationModal();
-
     const inputQuestions = await gatherInputFieldChecks();
     const radioQuestions = await gatherRadioButtonChecks();
     const dropdownQuestions = await gatherDropdownChecks();
-
-    return {
-        inputs: inputQuestions,
-        radios: radioQuestions,
-        dropdowns: dropdownQuestions
-    };
+    return [inputQuestions, radioQuestions, dropdownQuestions];
 }
 
 // Function to gather input field checks
@@ -726,27 +772,63 @@ export async function gatherDropdownChecks() {
     return questions;
 }
 
-// Function to run find easy apply
+// Function to run the "Find Easy Apply" process
 export async function runFindEasyApply() {
+    console.log('runFindEasyApply: Starting function');
+    
     try {
-        console.log('Looking for Easy Apply buttons...');
-        const easyApplyButtons = document.querySelectorAll('button.jobs-apply-button');
-        
-        if (easyApplyButtons.length > 0) {
-            // Click the first Easy Apply button
-            const firstButton = easyApplyButtons[0] as HTMLElement;
-            console.log('Clicking Easy Apply button');
-            firstButton.click();
-            await addShortDelay();
+        // Try multiple selectors for the Easy Apply button
+        const selectors = [
+            'button.jobs-apply-button',
+            'button[data-test-autoapply-button]',
+            'button[data-test-easy-apply-button]',
+            'button[data-control-name="apply"]',
+            '.jobs-apply-button'
+        ];
+
+        let applyButton: HTMLElement | null = null;
+
+        // Try each selector until we find a button
+        for (const selector of selectors) {
+            const button = document.querySelector(selector) as HTMLElement | null;
+            if (button) {
+                console.log(`runFindEasyApply: Found apply button with selector: ${selector}`);
+                applyButton = button;
+                break;
+            }
+        }
+
+        // If we still haven't found a button, log all buttons on the page
+        if (!applyButton) {
+            console.log('runFindEasyApply: No apply button found with standard selectors');
+            const allButtons = document.querySelectorAll('button');
+            console.log(`runFindEasyApply: Total buttons found on page: ${allButtons.length}`);
             
-            // Run the apply model
+            // Log button texts to help identify the apply button
+            allButtons.forEach((button, index) => {
+                const text = button.textContent?.trim() || 'No text';
+                const ariaLabel = button.getAttribute('aria-label') || 'No aria-label';
+                console.log(`runFindEasyApply: Button ${index} - Text: "${text}", aria-label: "${ariaLabel}"`);
+            });
+        }
+
+        if (applyButton) {
+            console.log('runFindEasyApply: Clicking apply button');
+            applyButton.click();
+            await addDelay();
+            console.log('runFindEasyApply: Completed clicking apply button');
+            
+            // Initiate the application process
+            console.log('runFindEasyApply: Starting application process');
             await runApplyModel();
         } else {
-            console.log('No Easy Apply buttons found');
+            console.log('runFindEasyApply: Apply button not found');
         }
     } catch (error) {
-        console.error('Error in runFindEasyApply:', error);
+        console.error('runFindEasyApply: Error finding or clicking apply button:', error);
     }
+    
+    console.log('runFindEasyApply: Function completed');
 }
 
 // Function to process questions with AI
@@ -938,7 +1020,7 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
             }
         }
     } catch (error) {
-        console.error('Error in processQuestionsAI:', error);
+        console.error('Error processing questions with AI:', error);
         return false;
     }
 }

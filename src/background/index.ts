@@ -218,7 +218,9 @@ chrome.runtime.onInstalled.addListener((details) => {
       veryShortDelay: '1000',
       shortDelay: '5000',
       longDelay: '7000',
-      minMatchScore: '3'
+      minMatchScore: '3',
+      useCustomAI: false, // By default, use Gemini API
+      geminiModel: 'gemini-2.0-flash-lite' // Default Gemini model
     }, () => {
       console.log('Default settings initialized');
     });

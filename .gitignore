@@ -26,3 +26,4 @@ yarn-error.log*
 
 # OS generated files
 Thumbs.db
+src/content/content_js_converted.ts

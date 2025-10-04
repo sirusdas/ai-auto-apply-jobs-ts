@@ -263,22 +263,153 @@ export async function performInputFieldCityCheck() {
 export async function performCheckBoxFieldCityCheck() {
     try {
         // Look for checkbox fields related to city or location
-        const checkboxFieldsets = document.querySelectorAll('fieldset[data-test-checkbox-form-component="true"]');
-        
-        checkboxFieldsets.forEach(fieldset => {
-            const firstCheckbox = fieldset.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-            if (firstCheckbox) {
-                firstCheckbox.checked = true;
-                firstCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        });
+        const checkboxFields = document.querySelectorAll('input[type="checkbox"][id*="city"], input[type="checkbox"][aria-labelledby*="city"]');
         
         // Usually we don't want to automatically check these, but we should log them
-        if (checkboxFieldsets.length > 0) {
-            console.log('Found city-related checkbox fields:', checkboxFieldsets.length);
+        if (checkboxFields.length > 0) {
+            console.log('Found city-related checkbox fields:', checkboxFields.length);
         }
     } catch (error) {
         console.error('Error in checkbox field city check:', error);
+    }
+}
+
+// Function to handle mandatory checkboxes in application forms
+export async function handleMandatoryCheckboxes() {
+    try {
+        // Find all unchecked checkboxes
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        
+        for (const checkbox of Array.from(allCheckboxes)) {
+            let isMandatory = false;
+            
+            // Check if this checkbox is explicitly marked as required
+            if (checkbox.required || checkbox.getAttribute('aria-required') === 'true') {
+                isMandatory = true;
+            }
+            
+            // Check if checkbox is in a fieldset marked as a checkbox form component
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            if (fieldset) {
+                // Check if the fieldset has a title marked as required
+                const requiredTitle = fieldset.querySelector('.fb-dash-form-element__label-title--is-required');
+                const requiredIndicator = fieldset.querySelector('[data-test-checkbox-form-required="true"]');
+                
+                // Also check for error messages that indicate the checkbox is required
+                const errorMessage = fieldset.nextElementSibling?.querySelector('.artdeco-inline-feedback--error');
+                const hasSelectCheckboxError = errorMessage?.textContent?.includes('Select checkbox to proceed');
+                
+                if (requiredTitle || requiredIndicator || hasSelectCheckboxError) {
+                    isMandatory = true;
+                }
+            }
+            
+            // Check if this checkbox has an associated label that indicates it's required
+            const label = checkbox.closest('label') || 
+                         document.querySelector(`label[for="${checkbox.id}"]`) ||
+                         checkbox.closest('.fb-dash-form-element')?.querySelector('label');
+            
+            const labelText = label?.textContent?.toLowerCase() || '';
+            const isMandatoryLabel = labelText.includes('*') || 
+                                   labelText.includes('required') || 
+                                   labelText.includes('mandatory') ||
+                                   labelText.includes('agree') ||
+                                   labelText.includes('consent') ||
+                                   labelText.includes('acknowledge');
+            
+            // If checkbox is required or has a mandatory label, check it
+            if (isMandatory || isMandatoryLabel) {
+                console.log('Checking mandatory checkbox:', labelText || checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            }
+        }
+        
+        // Log how many checkboxes were processed
+        if (allCheckboxes.length > 0) {
+            console.log('Processed unchecked checkboxes:', allCheckboxes.length);
+        }
+    } catch (error) {
+        console.error('Error handling mandatory checkboxes:', error);
+    }
+}
+
+// Function to handle all checkboxes during dummy data collection phase
+export async function handleAllCheckboxesForDataCollection() {
+    try {
+        console.log('Starting handleAllCheckboxesForDataCollection');
+        
+        // Find all unchecked checkboxes
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        console.log('Found unchecked checkboxes:', allCheckboxes.length);
+        
+        // Log details about each checkbox
+        allCheckboxes.forEach((checkbox, index) => {
+            console.log(`Checkbox ${index}:`, {
+                id: checkbox.id,
+                name: checkbox.name,
+                className: checkbox.className,
+                required: checkbox.required,
+                ariaRequired: checkbox.getAttribute('aria-required'),
+                checked: checkbox.checked,
+                parentElement: checkbox.parentElement?.tagName,
+                closestFieldset: checkbox.closest('fieldset')?.getAttribute('data-test-checkbox-form-component'),
+                closestFormElement: checkbox.closest('.fb-dash-form-element')?.className
+            });
+        });
+        
+        // Check all checkboxes during data collection phase
+        for (const checkbox of Array.from(allCheckboxes)) {
+            // Check if checkbox is in a fieldset marked as a checkbox form component
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            if (fieldset) {
+                console.log('Processing checkbox in fieldset');
+                // For fieldsets, we want to be more specific about which checkboxes to check
+                // Check if this is a required checkbox based on the fieldset structure
+                const requiredTitle = fieldset.querySelector('.fb-dash-form-element__label-title--is-required');
+                const requiredIndicator = fieldset.querySelector('[data-test-checkbox-form-required="true"]');
+                
+                console.log('Fieldset details:', {
+                    hasRequiredTitle: !!requiredTitle,
+                    hasRequiredIndicator: !!requiredIndicator,
+                    fieldsetId: fieldset.id,
+                    fieldsetAttributes: Array.from(fieldset.attributes).map(attr => `${attr.name}=${attr.value}`)
+                });
+                
+                // Always check checkboxes in fieldsets during data collection
+                console.log('Checking checkbox in fieldset during data collection:', checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            } else {
+                // For standalone checkboxes, check them all during data collection
+                console.log('Checking standalone checkbox during data collection:', checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            }
+        }
+        
+        // Log how many checkboxes were processed
+        if (allCheckboxes.length > 0) {
+            console.log('Checked all checkboxes for data collection:', allCheckboxes.length);
+        } else {
+            console.log('No unchecked checkboxes found');
+        }
+        
+        // After processing, let's check if there are any remaining unchecked checkboxes
+        const remainingUnchecked = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        console.log('Remaining unchecked checkboxes after processing:', remainingUnchecked.length);
+        remainingUnchecked.forEach((checkbox, index) => {
+            console.log(`Remaining checkbox ${index}:`, {
+                id: checkbox.id,
+                name: checkbox.name,
+                checked: checkbox.checked
+            });
+        });
+    } catch (error) {
+        console.error('Error checking all checkboxes for data collection:', error);
     }
 }
 
@@ -420,16 +551,36 @@ export async function performDropdownChecks(prefillableData: any = {}) {
 
 // Function to run validations
 export async function runValidations(prefillableData: any = {}) {
+    console.log('Starting runValidations with prefillableData:', prefillableData);
+    
     // Handle safety reminders first
+    console.log('Performing safety reminder check');
     await performSafetyReminderCheck();
     
     // Perform various field checks
+    console.log('Performing input field checks');
     await performInputFieldChecks(prefillableData);
+    
+    console.log('Performing input field city check');
     await performInputFieldCityCheck();
+    
+    console.log('Performing checkbox field city check');
     await performCheckBoxFieldCityCheck();
+    
+    console.log('Handling mandatory checkboxes');
+    await handleMandatoryCheckboxes();
+    
+    console.log('Handling all checkboxes for data collection');
+    await handleAllCheckboxesForDataCollection();
+    
+    console.log('Performing radio button checks');
     await performRadioButtonChecks(prefillableData);
+    
+    console.log('Performing dropdown checks');
     await performDropdownChecks(prefillableData);
     
-    // Check for errors
+    console.log('Checking for errors');
     await checkForError();
+    
+    console.log('Completed runValidations');
 }
