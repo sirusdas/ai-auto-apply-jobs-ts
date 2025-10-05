@@ -49,9 +49,15 @@ export async function validateAndCloseConfirmationModal() {
 export async function checkForError() {
     try {
         // Look for error messages or alerts
-        const errorElements = document.querySelectorAll('.artdeco-alert, .artdeco-toast, .error-message, .alert');
+        const errorElements = document.querySelectorAll('.artdeco-alert, .artdeco-toast, .error-message, .alert, .artdeco-inline-feedback--error');
         if (errorElements.length > 0) {
             console.log('Error elements detected:', errorElements.length);
+            
+            // Log the error messages
+            errorElements.forEach((element, index) => {
+                const message = element.textContent?.trim();
+                console.log(`Error ${index + 1}:`, message);
+            });
             
             // Try to close error messages
             errorElements.forEach(element => {
@@ -283,17 +289,142 @@ export async function performCheckBoxFieldCityCheck() {
     }
 }
 
+// Function to handle privacy policy agreement checkboxes
+export async function handlePrivacyPolicyAgreement() {
+    try {
+        console.log('Starting handlePrivacyPolicyAgreement');
+        
+        // Find all checkboxes that might be related to privacy policy or terms of use
+        const privacyPolicyCheckboxes = document.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        
+        let privacyPolicyFound = false;
+        
+        for (const checkbox of Array.from(privacyPolicyCheckboxes)) {
+            // Get label text through various methods
+            let labelText = '';
+            
+            // Method 1: Check for associated label using for attribute
+            if (checkbox.id) {
+                const label = document.querySelector(`label[for="${checkbox.id}"]`);
+                if (label) {
+                    labelText = label.textContent?.toLowerCase() || '';
+                }
+            }
+            
+            // Method 2: Check for label inside the same container
+            if (!labelText) {
+                const parent = checkbox.closest('.fb-dash-form-element');
+                if (parent) {
+                    const label = parent.querySelector('label');
+                    if (label) {
+                        labelText = label.textContent?.toLowerCase() || '';
+                    }
+                }
+            }
+            
+            // Method 3: Check for adjacent text content
+            if (!labelText) {
+                // Check nearby text nodes
+                const textContent = checkbox.closest('body')?.textContent || '';
+                const checkboxHTML = checkbox.outerHTML || '';
+                const index = textContent.indexOf(checkboxHTML);
+                
+                if (index > -1) {
+                    const startIndex = Math.max(0, index - 100);
+                    const endIndex = Math.min(textContent.length, index + 200);
+                    labelText = textContent.substring(startIndex, endIndex).toLowerCase();
+                }
+            }
+            
+            // Check if this is a privacy policy checkbox
+            const isPrivacyPolicyCheckbox = labelText.includes('privacy policy') || 
+                                           labelText.includes('terms of use') || 
+                                           labelText.includes('i agree') ||
+                                           labelText.includes('consent') ||
+                                           labelText.includes('acknowledge') ||
+                                           labelText.includes('data protection');
+            
+            if (isPrivacyPolicyCheckbox) {
+                privacyPolicyFound = true;
+                console.log('Found privacy policy related checkbox:', labelText);
+                
+                // Check the checkbox if it's not already checked
+                if (!checkbox.checked) {
+                    console.log('Clicking privacy policy checkbox:', labelText);
+                    checkbox.checked = true;
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    await addShortDelay();
+                } else {
+                    console.log('Privacy policy checkbox already checked:', labelText);
+                }
+            }
+        }
+        
+        if (!privacyPolicyFound) {
+            console.log('No privacy policy related checkboxes found');
+        }
+        
+    } catch (error) {
+        console.error('Error handling privacy policy agreement checkboxes:', error);
+    }
+}
+
 // Function to handle mandatory checkboxes
 export async function handleMandatoryCheckboxes() {
     try {
-        const mandatoryCheckboxes = document.querySelectorAll('input[type="checkbox"][aria-required="true"]');
-        mandatoryCheckboxes.forEach((checkbox) => {
-            const input = checkbox as HTMLInputElement;
-            if (!input.checked) {
-                input.checked = true;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
+        // Find all unchecked checkboxes
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        
+        for (const checkbox of Array.from(allCheckboxes)) {
+            let isMandatory = false;
+            
+            // Check if this checkbox is explicitly marked as required
+            if (checkbox.required || checkbox.getAttribute('aria-required') === 'true') {
+                isMandatory = true;
             }
-        });
+            
+            // Check if checkbox is in a fieldset marked as a checkbox form component
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            if (fieldset) {
+                // Check if the fieldset has a title marked as required
+                const requiredTitle = fieldset.querySelector('.fb-dash-form-element__label-title--is-required');
+                const requiredIndicator = fieldset.querySelector('[data-test-checkbox-form-required="true"]');
+                
+                // Also check for error messages that indicate the checkbox is required
+                const errorMessage = fieldset.nextElementSibling?.querySelector('.artdeco-inline-feedback--error');
+                const hasSelectCheckboxError = errorMessage?.textContent?.includes('Select checkbox to proceed');
+                
+                if (requiredTitle || requiredIndicator || hasSelectCheckboxError) {
+                    isMandatory = true;
+                }
+            }
+            
+            // Check if this checkbox has an associated label that indicates it's required
+            const label = checkbox.closest('label') || 
+                         document.querySelector(`label[for="${checkbox.id}"]`) ||
+                         checkbox.closest('.fb-dash-form-element')?.querySelector('label');
+            
+            const labelText = label?.textContent?.toLowerCase() || '';
+            const isMandatoryLabel = labelText.includes('*') || 
+                                   labelText.includes('required') || 
+                                   labelText.includes('mandatory') ||
+                                   labelText.includes('agree') ||
+                                   labelText.includes('consent') ||
+                                   labelText.includes('acknowledge');
+            
+            // If checkbox is required or has a mandatory label, check it
+            if (isMandatory || isMandatoryLabel) {
+                console.log('Checking mandatory checkbox:', labelText || checkbox.id || 'Unnamed checkbox');
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                await addShortDelay();
+            }
+        }
+        
+        // Log how many checkboxes were processed
+        if (allCheckboxes.length > 0) {
+            console.log('Processed unchecked checkboxes:', allCheckboxes.length);
+        }
     } catch (error) {
         console.error('Error handling mandatory checkboxes:', error);
     }
@@ -304,11 +435,11 @@ export async function handleAllCheckboxesForDataCollection() {
     try {
         console.log('Starting handleAllCheckboxesForDataCollection');
         
-        // Find all unchecked checkboxes
-        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
-        console.log('Found unchecked checkboxes:', allCheckboxes.length);
+        // Find all checkboxes regardless of checked state to get complete picture
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        console.log('Found total checkboxes:', allCheckboxes.length);
         
-        // Log details about each checkbox
+        // First log all checkboxes for debugging
         allCheckboxes.forEach((checkbox, index) => {
             console.log(`Checkbox ${index}:`, {
                 id: checkbox.id,
@@ -319,57 +450,116 @@ export async function handleAllCheckboxesForDataCollection() {
                 checked: checkbox.checked,
                 parentElement: checkbox.parentElement?.tagName,
                 closestFieldset: checkbox.closest('fieldset')?.getAttribute('data-test-checkbox-form-component'),
-                closestFormElement: checkbox.closest('.fb-dash-form-element')?.className
+                closestFormElement: checkbox.closest('.fb-dash-form-element')?.className,
+                associatedLabel: document.querySelector(`label[for="${checkbox.id}"]`)?.textContent?.trim()
             });
         });
         
-        // Check all checkboxes during data collection phase
-        for (const checkbox of Array.from(allCheckboxes)) {
-            // Check if checkbox is in a fieldset marked as a checkbox form component
-            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
-            if (fieldset) {
-                console.log('Processing checkbox in fieldset');
-                // For fieldsets, we want to be more specific about which checkboxes to check
-                // Check if this is a required checkbox based on the fieldset structure
-                const requiredTitle = fieldset.querySelector('.fb-dash-form-element__label-title--is-required');
-                const requiredIndicator = fieldset.querySelector('[data-test-checkbox-form-required="true"]');
-                
-                console.log('Fieldset details:', {
-                    hasRequiredTitle: !!requiredTitle,
-                    hasRequiredIndicator: !!requiredIndicator,
-                    fieldsetId: fieldset.id,
-                    fieldsetAttributes: Array.from(fieldset.attributes).map(attr => `${attr.name}=${attr.value}`)
-                });
-                
-                // Always check checkboxes in fieldsets during data collection
-                console.log('Checking checkbox in fieldset during data collection:', checkbox.id || 'Unnamed checkbox');
-                checkbox.checked = true;
-                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                await addShortDelay();
-            } else {
-                // For standalone checkboxes, check them all during data collection
-                console.log('Checking standalone checkbox during data collection:', checkbox.id || 'Unnamed checkbox');
-                checkbox.checked = true;
-                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                await addShortDelay();
+        // Now process only unchecked checkboxes
+        const uncheckedCheckboxes = Array.from(allCheckboxes).filter(cb => !cb.checked);
+        
+        // If we find checkboxes that are not in a fieldset but have required indicators, handle them specially
+        const specialCheckboxes = uncheckedCheckboxes.filter(checkbox => {
+            // Check if checkbox has aria-required set
+            if (checkbox.getAttribute('aria-required') === 'true') return true;
+            
+            // Check if checkbox has a required label
+            const label = document.querySelector(`label[for="${checkbox.id}"]`);
+            if (label?.textContent?.includes('*') || 
+                label?.textContent?.toLowerCase().includes('required') || 
+                label?.textContent?.toLowerCase().includes('mandatory')) {
+                return true;
             }
+            
+            // Check if checkbox is in a form element marked as required
+            const formElement = checkbox.closest('.fb-dash-form-element');
+            if (formElement?.querySelector('.fb-dash-form-element__label-title--is-required')) {
+                return true;
+            }
+            
+            return false;
+        });
+        
+        // Handle special checkboxes first (those that are explicitly required)
+        for (const checkbox of specialCheckboxes) {
+            console.log('Handling special checkbox:', checkbox.id || 'Unnamed checkbox', {
+                hasAriaRequired: checkbox.getAttribute('aria-required') === 'true',
+                hasRequiredLabel: document.querySelector(`label[for="${checkbox.id}"]`)?.textContent?.includes('*') || 
+                                  document.querySelector(`label[for="${checkbox.id}"]`)?.textContent?.toLowerCase().includes('required'),
+                inRequiredFormElement: !!checkbox.closest('.fb-dash-form-element')?.querySelector('.fb-dash-form-element__label-title--is-required')
+            });
+            
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            await addShortDelay();
+        }
+        
+        // Handle checkboxes in fieldsets marked as a checkbox form component
+        const fieldsetCheckboxes = uncheckedCheckboxes.filter(cb => 
+            cb.closest('fieldset[data-test-checkbox-form-component="true"]')
+        );
+        
+        for (const checkbox of fieldsetCheckboxes) {
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            console.log('Processing checkbox in fieldset');
+            
+            // Check if this is a required checkbox based on the fieldset structure
+            const requiredTitle = fieldset?.querySelector('.fb-dash-form-element__label-title--is-required');
+            const requiredIndicator = fieldset?.querySelector('[data-test-checkbox-form-required="true"]');
+            
+            console.log('Fieldset details:', {
+                hasRequiredTitle: !!requiredTitle,
+                hasRequiredIndicator: !!requiredIndicator,
+                fieldsetId: fieldset?.id,
+                fieldsetAttributes: Array.from(fieldset?.attributes || []).map(attr => `${attr.name}=${attr.value}`)
+            });
+            
+            // Always check checkboxes in fieldsets during data collection
+            console.log('Checking checkbox in fieldset during data collection:', checkbox.id || 'Unnamed checkbox');
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            await addShortDelay();
+        }
+        
+        // Handle standalone checkboxes (not in fieldsets)
+        const standaloneCheckboxes = uncheckedCheckboxes.filter(cb => 
+            !cb.closest('fieldset[data-test-checkbox-form-component="true"]') && 
+            !specialCheckboxes.includes(cb)
+        );
+        
+        for (const checkbox of standaloneCheckboxes) {
+            // Skip checkboxes that look like they might be required (we've already handled those in specialCheckboxes)
+            if (checkbox.required || 
+                checkbox.getAttribute('aria-required') === 'true' ||
+                checkbox.closest('.fb-dash-form-element')?.querySelector('.fb-dash-form-element__label-title--is-required')) {
+                continue;
+            }
+            
+            console.log('Checking standalone checkbox during data collection:', checkbox.id || 'Unnamed checkbox');
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            await addShortDelay();
         }
         
         // Log how many checkboxes were processed
-        if (allCheckboxes.length > 0) {
-            console.log('Checked all checkboxes for data collection:', allCheckboxes.length);
+        const processedCount = specialCheckboxes.length + fieldsetCheckboxes.length + standaloneCheckboxes.length;
+        if (processedCount > 0) {
+            console.log(`Checked checkboxes for data collection: ${processedCount} total (${specialCheckboxes.length} special, ${fieldsetCheckboxes.length} in fieldsets, ${standaloneCheckboxes.length} standalone)`);
         } else {
-            console.log('No unchecked checkboxes found');
+            console.log('No checkboxes needed processing');
         }
         
-        // After processing, let's check if there are any remaining unchecked checkboxes
+        // After processing, check if there are any remaining unchecked checkboxes
         const remainingUnchecked = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
         console.log('Remaining unchecked checkboxes after processing:', remainingUnchecked.length);
         remainingUnchecked.forEach((checkbox, index) => {
             console.log(`Remaining checkbox ${index}:`, {
                 id: checkbox.id,
                 name: checkbox.name,
-                checked: checkbox.checked
+                checked: checkbox.checked,
+                reason: checkbox.checked ? 'Already checked' : 
+                        specialCheckboxes.includes(checkbox) ? 'Special checkbox' : 
+                        fieldsetCheckboxes.includes(checkbox) ? 'In fieldset' : 'Standalone'
             });
         });
     } catch (error) {
@@ -526,6 +716,59 @@ export async function runValidations(prefillableData: any = {}) {
     await performCheckBoxFieldCityCheck();
     await handleMandatoryCheckboxes(); // Handle mandatory checkboxes
     await handleAllCheckboxesForDataCollection(); // Check all checkboxes during data collection phase
+    await handlePrivacyPolicyAgreement(); // Handle privacy policy agreement checkboxes
+    
+    // Additional specific handling for privacy policy agreement checkboxes
+    try {
+        console.log('Additional handling for privacy policy agreement checkboxes');
+        // Find all unchecked checkboxes
+        const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+        console.log('Found unchecked checkboxes for additional privacy policy handling:', allCheckboxes.length);
+        
+        for (const checkbox of Array.from(allCheckboxes)) {
+            // Check if checkbox is in a fieldset marked as a checkbox form component
+            const fieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+            if (fieldset) {
+                console.log('Processing checkbox in fieldset for additional privacy policy handling');
+                
+                // Check for privacy policy related text in the legend
+                const legend = fieldset.querySelector('legend');
+                const legendText = legend?.textContent?.toLowerCase() || '';
+                const isPrivacyPolicyRelated = legendText.includes('privacy policy') || 
+                                             legendText.includes('terms of use') || 
+                                             legendText.includes('i agree') ||
+                                             legendText.includes('consent') ||
+                                             legendText.includes('acknowledge') ||
+                                             legendText.includes('declaration');
+                
+                // Also check if there's an error message associated with this checkbox
+                const errorMessage = fieldset.nextElementSibling?.querySelector('.artdeco-inline-feedback--error');
+                const hasSelectCheckboxError = errorMessage?.textContent?.includes('Select checkbox to proceed');
+                
+                console.log('Additional privacy policy checkbox details:', {
+                    isPrivacyPolicyRelated,
+                    hasSelectCheckboxError,
+                    legendText: legendText.substring(0, 100) + '...' // First 100 chars
+                });
+                
+                // If this is a privacy policy related checkbox or has a "Select checkbox to proceed" error, check it
+                if (isPrivacyPolicyRelated || hasSelectCheckboxError) {
+                    console.log('Checking additional privacy policy checkbox:', checkbox.id || 'Unnamed checkbox');
+                    checkbox.checked = true;
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    await addShortDelay();
+                }
+            }
+        }
+        
+        console.log('Completed additional handling for privacy policy agreement checkboxes');
+    } catch (error) {
+        console.error('Error in additional handling for privacy policy agreement checkboxes:', error);
+    }
+    
+    // Handle checkboxes with specific error messages
+    await handleCheckboxWithSpecificError();
+    
     await performRadioButtonChecks(prefillableData);
     await performDropdownChecks(prefillableData);
     
@@ -607,13 +850,21 @@ export async function runApplyModel(
         const reviewBtn = document.querySelector<HTMLButtonElement>('button[aria-label="Review your application"]');
         const submitBtn = document.querySelector<HTMLButtonElement>('button[aria-label="Submit application"]');
 
+        console.log('nextBtn:', nextBtn);
+        console.log('reviewBtn:', reviewBtn);
+        console.log('submitBtn:', submitBtn);
+
         if (submitBtn) {
+            console.log('Found submit button, submitting application');
             await addShortDelay();
             await uncheckFollowCompany();
             await addShortDelay();
+            console.log('Clicking submit button');
             submitBtn.click();
             await addDelay();
+            console.log('Closing application modal');
             document.querySelector<HTMLElement>('.artdeco-modal__dismiss')?.click();
+            console.log('Application submitted successfully');
             return;
         }
 
@@ -625,23 +876,61 @@ export async function runApplyModel(
                 overallDropdownQuestions.push(...d);
             }
 
-            if (reviewBtn && fetchingFieldValues && Object.keys(prefillableData).length === 0) {
-                await terminateJobModel();
-                const questions = [...overallInputQuestions, ...overallRadioButtonQuestions, ...overallDropdownQuestions];
-                const aiResponse = await processQuestionsAI(questions);
-                if (aiResponse) {
-                    const { inputs, dropdowns, radios } = aiResponse;
-                    prefillableData = { inputs, dropdowns, radios };
-                }
-                return runFindEasyApply();
+            const btn = reviewBtn || nextBtn!;
+            console.log('Processing button in application flow', {
+                isReviewButton: !!reviewBtn,
+                isNextButton: !!nextBtn,
+                fetchingFieldValues,
+                hasPrefillableData: Object.keys(prefillableData).length > 0
+            });
+            
+            if (!fetchingFieldValues) {
+                console.log('Running validations with AI data', prefillableData);
+                await runValidations(prefillableData);
             }
 
-            const btn = reviewBtn || nextBtn!;
-            if (!fetchingFieldValues) await runValidations(prefillableData);
-
             if (await checkForError()) {
-                await terminateJobModel();
-                await addShortDelay();
+                // Before terminating, try to handle checkbox errors specifically
+                await handleCheckboxWithSpecificError();
+                
+                // Check again if the error is resolved
+                if (await checkForError()) {
+                    // Error still exists, terminate the job model
+                    await terminateJobModel();
+                    await addShortDelay();
+                } else {
+                    // Error was resolved, continue with the application process
+                    console.log('Checkbox error resolved, continuing application process');
+                    await addDelay();
+                    const progressBar = document.querySelector<HTMLProgressElement>('.artdeco-completeness-meter-linear__progress-container progress');
+                    if (!progressBar) {
+                        await terminateJobModel();
+                        return;
+                    }
+                    await addDelay();
+                    console.log('Clicking Next/Review button:', {
+                        isReviewButton: !!reviewBtn,
+                        isNextButton: !!nextBtn,
+                        buttonText: btn.textContent?.trim()
+                    });
+                    if(!!reviewBtn){
+                        await processReviewButton({
+                            reviewBtn,
+                            fetchingFieldValues,
+                            prefillableData,
+                            overallInputQuestions,
+                            overallRadioButtonQuestions,
+                            overallDropdownQuestions
+                        });
+                        console.log('Clicked Review button');
+                    }
+                    else{
+                        btn.click();
+                        console.log('Clicked Next button');
+                        await  addShortDelay();
+                        return runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
+                    }
+                }
             } else {
                 await addDelay();
                 const progressBar = document.querySelector<HTMLProgressElement>('.artdeco-completeness-meter-linear__progress-container progress');
@@ -650,10 +939,28 @@ export async function runApplyModel(
                     return;
                 }
                 await addDelay();
-                btn.click();
-                await closeApplicationSentModal();
-                await addShortDelay();
-                return runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
+                console.log('Clicking Next/Review button:', {
+                    isReviewButton: !!reviewBtn,
+                    isNextButton: !!nextBtn,
+                    buttonText: btn.textContent?.trim()
+                });
+                if(!!reviewBtn){
+                    await processReviewButton({
+                        reviewBtn,
+                        fetchingFieldValues,
+                        prefillableData,
+                        overallInputQuestions,
+                        overallRadioButtonQuestions,
+                        overallDropdownQuestions
+                    });
+                    console.log('Clicked Review button');
+                }
+                else{
+                    btn.click();
+                    console.log('Clicked Next button');
+                    await  addShortDelay();
+                    return runApplyModel(fetchingFieldValues, overallInputQuestions, overallRadioButtonQuestions, overallDropdownQuestions, prefillableData);
+                }
             }
         } else {
             document.querySelector<HTMLElement>('.artdeco-modal__dismiss')?.click();
@@ -663,12 +970,68 @@ export async function runApplyModel(
     }
 }
 
+interface ProcessReviewButtonParams {
+    reviewBtn: HTMLButtonElement;
+    fetchingFieldValues: boolean;
+    prefillableData: Record<string, any>;
+    overallInputQuestions: string[];
+    overallRadioButtonQuestions: string[];
+    overallDropdownQuestions: string[];
+}
+
+async function processReviewButton({
+    reviewBtn,
+    fetchingFieldValues,
+    prefillableData,
+    overallInputQuestions,
+    overallRadioButtonQuestions,
+    overallDropdownQuestions
+}: ProcessReviewButtonParams): Promise<void> {
+    if (
+        reviewBtn &&
+        fetchingFieldValues &&
+        Object.keys(prefillableData).length === 0
+    ) {
+        // Close the current form/modal to discard the dummy data
+        console.log('Closing form to discard dummy data before AI processing');
+
+        // Send questions to AI for processing
+        const questions = [
+            ...overallInputQuestions,
+            ...overallRadioButtonQuestions,
+            ...overallDropdownQuestions
+        ];
+        const aiResponse = await processQuestionsAI(questions);
+        if (aiResponse) {
+            const { inputs, dropdowns, radios } = aiResponse;
+            prefillableData = { inputs, dropdowns, radios };
+            console.log('runApplyModel: AI response received', { inputs, dropdowns, radios });
+        }
+        // Wait a bit for the modal to close
+        await addDelay();
+        // Restart the application process with AI data
+        console.log('Restarting application process with AI data');
+        await terminateJobModel();
+        await runFindEasyApply(false, prefillableData);
+        return;
+    } else if (reviewBtn) {
+        reviewBtn.click();
+    }
+}
+
 // Function to navigate through easy apply
 export async function navigateThroughEasyApply() {
+    console.log('navigateThroughEasyApply: Starting function');
     await validateAndCloseConfirmationModal();
     const inputQuestions = await gatherInputFieldChecks();
     const radioQuestions = await gatherRadioButtonChecks();
     const dropdownQuestions = await gatherDropdownChecks();
+    console.log('navigateThroughEasyApply: Completed function', { 
+        inputQuestions, 
+        radioQuestions, 
+        dropdownQuestions,
+        totalQuestions: inputQuestions.length + radioQuestions.length + dropdownQuestions.length
+    });
     return [inputQuestions, radioQuestions, dropdownQuestions];
 }
 
@@ -693,6 +1056,8 @@ export async function gatherInputFieldChecks() {
             }
         }
     });
+    
+    console.log('Gathered input field questions:', questions);
 
     return questions;
 }
@@ -725,6 +1090,8 @@ export async function gatherRadioButtonChecks() {
             }
         }
     });
+    
+    console.log('Gathered radio button questions:', questions);
 
     return questions;
 }
@@ -768,13 +1135,15 @@ export async function gatherDropdownChecks() {
             selectElement.dispatchEvent(new Event('change', { bubbles: true }));
         }
     });
+    
+    console.log('Gathered dropdown questions:', questions);
 
     return questions;
 }
 
 // Function to run the "Find Easy Apply" process
-export async function runFindEasyApply() {
-    console.log('runFindEasyApply: Starting function');
+export async function runFindEasyApply(fetchingFieldValues = true, prefillableData: any = {}) {
+    console.log('runFindEasyApply: Starting function', { fetchingFieldValues, prefillableData });
     
     try {
         // Try multiple selectors for the Easy Apply button
@@ -820,7 +1189,7 @@ export async function runFindEasyApply() {
             
             // Initiate the application process
             console.log('runFindEasyApply: Starting application process');
-            await runApplyModel();
+            await runApplyModel(fetchingFieldValues, [], [], [], prefillableData);
         } else {
             console.log('runFindEasyApply: Apply button not found');
         }
@@ -872,6 +1241,15 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
             });
         });
 
+        // Get actual user resume data from storage
+        const userResumeData = await new Promise<any>((resolve) => {
+            chrome.storage.local.get(['defaultFields'], (result) => {
+                resolve(result.defaultFields || defaultFields); // Fallback to hardcoded defaults if not found
+            });
+        });
+        
+        console.log('Using user resume data for AI processing:', userResumeData);
+
         // Helper function to get the selected model
         async function getSelectedGeminiModel(): Promise<string> {
             return new Promise((resolve) => {
@@ -898,7 +1276,7 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
                       - Dropdowns: Use clean question text (remove "question:" prefix) as key, value must be exact option text from options list.
                       - Radios: Use clean question text (remove "question:" prefix) as key, value must be exact option text from options list.
                       - Empty Sections: If CONTEXT array is empty, corresponding output section must be empty object.
-                      RESUME: ${JSON.stringify(defaultFields)}
+                      RESUME: ${JSON.stringify(userResumeData)}
                       CONTEXT: {"inputs": ${JSON.stringify(questions.filter(q => !q.includes('|| options:')))}, "dropdowns": ${JSON.stringify(questions.filter(q => q.includes('|| options:')))}, "radios": ${JSON.stringify(questions.filter(q => q.includes('|| options:')))}}. NOTE: Calculate total inputs, dropdowns, and radios inside them based on the provided **CONTEXT**. Make sure output has exact number of inputs, dropdowns, and radios items in it. If possible convert it into a dictionary where keys are the field names and values are the field values. Give it to me if i ask for it.`
                 };
 
@@ -979,7 +1357,7 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
                       - Dropdowns: Use clean question text (remove "question:" prefix) as key, value must be exact option text from options list.
                       - Radios: Use clean question text (remove "question:" prefix) as key, value must be exact option text from options list.
                       - Empty Sections: If CONTEXT array is empty, corresponding output section must be empty object.
-                      RESUME: ${JSON.stringify(defaultFields)}
+                      RESUME: ${JSON.stringify(userResumeData)}
                       CONTEXT: {"inputs": ${JSON.stringify(questions.filter(q => !q.includes('|| options:')))}, "dropdowns": ${JSON.stringify(questions.filter(q => q.includes('|| options:')))}, "radios": ${JSON.stringify(questions.filter(q => q.includes('|| options:')))}}. NOTE: Calculate total inputs, dropdowns, and radios inside them based on the provided **CONTEXT**. Make sure output has exact number of inputs, dropdowns, and radios items in it. If possible convert it into a dictionary where keys are the field names and values are the field values. Give it to me if i ask for it.`
                             }]
                         }]
@@ -1022,5 +1400,63 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
     } catch (error) {
         console.error('Error processing questions with AI:', error);
         return false;
+    }
+}
+
+// Function to handle checkboxes with specific error messages
+async function handleCheckboxWithSpecificError() {
+    try {
+        console.log('Starting handleCheckboxWithSpecificError');
+        
+        // Look for error messages first
+        const errorElements = document.querySelectorAll('.artdeco-inline-feedback--error');
+        console.log('Found error elements:', errorElements.length);
+        
+        for (const errorElement of Array.from(errorElements)) {
+            const errorMessage = errorElement.textContent?.trim() || '';
+            console.log('Processing error message:', errorMessage);
+            
+            // Check if this is the specific error we're looking for
+            if (errorMessage.includes('Select checkbox to proceed')) {
+                console.log('Found "Select checkbox to proceed" error message');
+                
+                // Look for the associated checkbox
+                // The error is typically in a div that follows the fieldset containing the checkbox
+                const fieldset = errorElement.parentElement?.previousElementSibling as HTMLElement;
+                if (fieldset && fieldset.tagName === 'FIELDSET') {
+                    console.log('Found associated fieldset');
+                    
+                    // Find the checkbox within this fieldset
+                    const checkbox = fieldset.querySelector('input[type="checkbox"]:not(:checked)') as HTMLInputElement | null;
+                    if (checkbox) {
+                        console.log('Found unchecked checkbox in fieldset, checking it');
+                        checkbox.checked = true;
+                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        await addShortDelay();
+                    } else {
+                        console.log('No unchecked checkbox found in fieldset');
+                    }
+                } else {
+                    console.log('Could not find associated fieldset, trying alternative approach');
+                    
+                    // Alternative approach: look for any unchecked checkbox on the page
+                    const allCheckboxes = document.querySelectorAll('input[type="checkbox"]:not(:checked)') as NodeListOf<HTMLInputElement>;
+                    console.log('Found unchecked checkboxes (alternative approach):', allCheckboxes.length);
+                    
+                    for (const checkbox of Array.from(allCheckboxes)) {
+                        // Check if checkbox is in a fieldset marked as a checkbox form component
+                        const parentFieldset = checkbox.closest('fieldset[data-test-checkbox-form-component="true"]');
+                        if (parentFieldset) {
+                            console.log('Checking checkbox in fieldset (alternative approach)');
+                            checkbox.checked = true;
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                            await addShortDelay();
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error handling checkboxes with specific error messages:', error);
     }
 }

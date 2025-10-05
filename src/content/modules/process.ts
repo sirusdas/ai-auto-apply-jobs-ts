@@ -239,7 +239,7 @@ export async function runAutoApplyProcess(resume: any) {
         console.log(`Job match score: ${matchScore}`);
 
         // Run Easy Apply
-        await runFindEasyApply();
+        await runFindEasyApply(true, {});
 
         // Update counters
         processedCount++;
