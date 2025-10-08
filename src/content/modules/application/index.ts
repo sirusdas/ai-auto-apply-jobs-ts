@@ -1243,12 +1243,12 @@ export async function processQuestionsAI(questions: string[]): Promise<any> {
 
         // Get actual user resume data from storage
         const userResumeData = await new Promise<any>((resolve) => {
-            chrome.storage.local.get(['defaultFields'], (result) => {
-                resolve(result.defaultFields || defaultFields); // Fallback to hardcoded defaults if not found
+            chrome.storage.local.get(['compressedResumeYAML'], (result) => {
+                resolve(result.compressedResumeYAML || defaultFields); // Fallback to hardcoded defaults if not found
             });
         });
         
-        console.log('Using user resume data for AI processing:', userResumeData);
+        console.log('Using user compressed resume data for AI processing:', userResumeData);
 
         // Helper function to get the selected model
         async function getSelectedGeminiModel(): Promise<string> {
