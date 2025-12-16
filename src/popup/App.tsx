@@ -6,10 +6,11 @@ import JobMatchSettings from './components/JobMatchSettings';
 import CompanyPreferences from './components/CompanyPreferences';
 import DelaySettings from './components/DelaySettings';
 import AppliedJobs from './components/AppliedJobs';
+import GeminiSettings from './components/GeminiSettings';
 import '../assets/styles/popup.css';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'settings' | 'applied-jobs' | 'personal-info' | 'resume' | 'match' | 'company' | 'delay'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'applied-jobs' | 'personal-info' | 'resume' | 'match' | 'company' | 'delay' | 'gemini'>('settings');
   const [isTokenValid, setIsTokenValid] = useState<boolean>(false);
 
   const handleTokenValidated = (valid: boolean) => {
@@ -29,7 +30,15 @@ const App: React.FC = () => {
               className={activeTab === 'settings' ? 'active' : ''} 
               onClick={() => setActiveTab('settings')}
             >
-              Settings
+              API Settings
+            </button>
+          </li>
+          <li>
+            <button 
+              className={activeTab === 'gemini' ? 'active' : ''} 
+              onClick={() => setActiveTab('gemini')}
+            >
+              Gemini API
             </button>
           </li>
           <li>
@@ -61,7 +70,7 @@ const App: React.FC = () => {
               className={activeTab === 'match' ? 'active' : ''} 
               onClick={() => setActiveTab('match')}
             >
-              Match Settings
+              Job Match
             </button>
           </li>
           <li>
@@ -82,35 +91,25 @@ const App: React.FC = () => {
           </li>
         </ul>
       </nav>
-      
+
       <main>
         {activeTab === 'settings' && (
           <TokenSettings />
         )}
         
-        {activeTab === 'applied-jobs' && (
-          <AppliedJobs />
-        )}
+        {activeTab === 'gemini' && <GeminiSettings />}
         
-        {activeTab === 'personal-info' && (
-          <PersonalInfoSettings />
-        )}
+        {activeTab === 'applied-jobs' && <AppliedJobs />}
         
-        {activeTab === 'resume' && (
-          <ResumeManagement />
-        )}
+        {activeTab === 'personal-info' && <PersonalInfoSettings />}
         
-        {activeTab === 'match' && (
-          <JobMatchSettings />
-        )}
+        {activeTab === 'resume' && <ResumeManagement />}
         
-        {activeTab === 'company' && (
-          <CompanyPreferences />
-        )}
+        {activeTab === 'match' && <JobMatchSettings />}
         
-        {activeTab === 'delay' && (
-          <DelaySettings />
-        )}
+        {activeTab === 'company' && <CompanyPreferences />}
+        
+        {activeTab === 'delay' && <DelaySettings />}
       </main>
     </div>
   );

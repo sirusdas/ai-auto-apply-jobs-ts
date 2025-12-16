@@ -6,9 +6,9 @@ const AccessTokenSettings: React.FC = () => {
 
   useEffect(() => {
     // Load saved access token
-    chrome.storage.local.get(['accessToken'], (result) => {
-      if (result.accessToken) {
-        setAccessToken(result.accessToken);
+    chrome.storage.local.get(['geminiApiKey'], (result) => {
+      if (result.geminiApiKey) {
+        setAccessToken(result.geminiApiKey);
       }
     });
   }, []);
@@ -19,7 +19,7 @@ const AccessTokenSettings: React.FC = () => {
       return;
     }
 
-    chrome.storage.local.set({ accessToken: accessToken.trim() }, () => {
+    chrome.storage.local.set({ geminiApiKey: accessToken.trim() }, () => {
       setStatus({ type: 'success', message: 'Access token saved successfully!' });
       setTimeout(() => setStatus(null), 3000);
     });

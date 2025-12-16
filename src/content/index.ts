@@ -1374,7 +1374,13 @@ function startTimerDisplay(initialRemainingMs: number) {
 
 // Global bootstrap
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initExtensionUI);
+    document.addEventListener('DOMContentLoaded', createMainButton);
 } else {
-  initExtensionUI();
+    createMainButton();
 }
+
+// Make functions available globally for UI event handlers
+(window as any).startAutoApplyProcess = startAutoApplyProcess;
+(window as any).stopAutoApplyProcess = stopAutoApplyProcess;
+
+export { };
