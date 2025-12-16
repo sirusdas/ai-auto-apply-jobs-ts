@@ -568,7 +568,303 @@ body.dark-mode .toast-message.error {
   background-color: #dc3545;
 }
 
+/* Run in Loop Toggle Styles */
+.search-timer-config .form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 10px;
+}
+
+.search-timer-config .form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* Dark mode support for toggle */
+body.dark-mode .search-timer-config .form-group small {
+  color: #adb5bd;
+}
+
 /* Settings-specific styles that aren't in popup.css */
 /* These styles complement the main popup.css styles */
 
-/* Additional styles for the settings page can be added here if needed */
+/* Add styles for the stop button */
+.stop-button {
+  position: fixed;
+  top: 20px;
+  right: 90px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #f44336;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.stop-button:hover {
+  background-color: #d32f2f;
+  transform: scale(1.1);
+}
+
+/* Existing CSS */
+.search-timer-config .form-group {
+  margin-bottom: 15px;
+}
+
+.search-timer-config label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.search-timer-config input[type="text"],
+.search-timer-config input[type="number"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.search-timer-config .job {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: #f9f9f9;
+}
+
+.search-timer-config .location,
+.search-timer-config .jobType {
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+  background-color: #fff;
+}
+
+.search-timer-config .btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.search-timer-config .btn-danger:hover {
+  background-color: #c82333;
+}
+
+.search-timer-config .jobConfig > .btn-danger {
+  background-color: #6c757d;
+}
+
+.search-timer-config .jobConfig > .btn-danger:hover {
+  background-color: #5a6268;
+}
+
+.search-timer-config .location .btn-danger {
+  background-color: #fd7e14;
+}
+
+.search-timer-config .location .btn-danger:hover {
+  background-color: #e06d10;
+}
+
+.search-timer-config .jobType .btn-danger {
+  background-color: #20c997;
+}
+
+.search-timer-config .jobType .btn-danger:hover {
+  background-color: #1baa80;
+}
+
+.form-control-configurations .btn-danger,
+.search-timer-config .btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.form-control-configurations .btn-danger:hover,
+.search-timer-config .btn-danger:hover {
+  background-color: #c82333;
+}
+
+.search-timer-config .form-group small {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.run-in-loop-toggle {
+  background-color: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.run-in-loop-toggle label {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.run-in-loop-toggle input[type="checkbox"] {
+  margin-right: 10px;
+  transform: scale(1.3);
+}
+
+.run-in-loop-toggle small {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-top: 8px;
+  margin-left: 28px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 90%;
+  max-height: 90%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 800px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.job-info {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.job-info h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.job-info p {
+  margin: 5px 0;
+}
+
+.form-data h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.form-section {
+  margin-bottom: 20px;
+}
+
+.form-section h5 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.form-section table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+}
+
+.form-section th,
+.form-section td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.form-section th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.modal-footer {
+  padding: 15px 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  background-color: #0077b5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #005885;
+}

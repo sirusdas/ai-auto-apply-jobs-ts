@@ -18,13 +18,15 @@ const SearchTimerConfig: React.FC = () => {
       }>;
   }>>([]);
   
+  const [runInLoop, setRunInLoop] = useState<boolean>(false);
+  
   const jsonEditorRef = useRef<HTMLDivElement>(null);
   const jsonEditorInstance = useRef<any>(null);
   const [isJsonEditing, setIsJsonEditing] = useState(false);
 
   useEffect(() => {
     // Load saved job configurations
-    chrome.storage.local.get(['jobConfigs'], (result) => {
+    chrome.storage.local.get(['jobConfigs', 'runInLoop'], (result) => {
       if (result.jobConfigs) {
         setJobConfigs(result.jobConfigs);
       } else {
@@ -45,6 +47,10 @@ const SearchTimerConfig: React.FC = () => {
             jobTypeTimer: ''
           }]
         }]);
+      }
+      
+      if (result.runInLoop !== undefined) {
+        setRunInLoop(result.runInLoop);
       }
     });
   }, []);
@@ -159,7 +165,7 @@ const SearchTimerConfig: React.FC = () => {
   };
 
   const handleSave = () => {
-    chrome.storage.local.set({ jobConfigs }, () => {
+    chrome.storage.local.set({ jobConfigs, runInLoop }, () => {
       // Show success message
       const toast = document.getElementById('toast-message');
       if (toast) {
@@ -261,6 +267,22 @@ const SearchTimerConfig: React.FC = () => {
   return (
     <div className="search-timer-config">
       <h2>Search and Timer Configuration</h2>
+      
+      {/* Run in Loop Toggle */}
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={runInLoop}
+            onChange={(e) => setRunInLoop(e.target.checked)}
+          />
+          Run in Loop
+        </label>
+        <small>
+          Enable this option to continuously repeat the job search process. 
+          When disabled, the search will run only once through all configurations.
+        </small>
+      </div>
       
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
         <div className="jobs-container">

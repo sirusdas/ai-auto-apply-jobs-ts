@@ -108,7 +108,7 @@ ${resumeText}`;
 
         const data = await response.json();
         compressedYaml = data?.data?.text || '';
-        
+
         // Clean up the response
         compressedYaml = compressedYaml.replace(/^```yaml\n/, '').replace(/\n```$/, '');
       } else {
@@ -123,7 +123,7 @@ ${resumeText}`;
           return;
         }
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${accessToken}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${accessToken}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -143,7 +143,7 @@ ${resumeText}`;
 
         const data = await response.json();
         compressedYaml = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        
+
         // Clean up the response
         compressedYaml = compressedYaml.replace(/^```yaml\n/, '').replace(/\n```$/, '');
       }
@@ -153,7 +153,7 @@ ${resumeText}`;
       }
 
       // Save to storage
-      chrome.storage.local.set({ 
+      chrome.storage.local.set({
         plainTextResume: resumeText,
         compressedResumeYAML: compressedYaml
       }, () => {
@@ -195,7 +195,7 @@ ${resumeText}`;
   return (
     <div className="resume-management">
       <h2>Resume Management</h2>
-      
+
       <div className="form-group">
         <label htmlFor="resume-text">Full Resume Text:</label>
         <textarea
@@ -206,14 +206,14 @@ ${resumeText}`;
           rows={10}
         />
       </div>
-      
-      <button 
-        className="btn btn-primary" 
+
+      <button
+        className="btn btn-primary"
         onClick={handleGenerateResume}
       >
         Generate Compressed Resume
       </button>
-      
+
       <div className="form-group" style={{ marginTop: '20px' }}>
         <label htmlFor="compressed-resume">Compressed YAML Resume:</label>
         <textarea
@@ -224,22 +224,22 @@ ${resumeText}`;
           rows={10}
         />
       </div>
-      
+
       <div className="button-group">
-        <button 
-          className="btn btn-secondary" 
+        <button
+          className="btn btn-secondary"
           onClick={handleEditResume}
         >
           Edit Resume
         </button>
-        <button 
-          className="btn btn-primary" 
+        <button
+          className="btn btn-primary"
           onClick={handleSaveManualResume}
         >
           Save Manual Resume
         </button>
       </div>
-      
+
       {status && (
         <div className={`status-message ${status.type}`}>
           {status.message}

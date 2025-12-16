@@ -34,6 +34,7 @@ interface AppliedJob {
   company: string;
   location: string;
   appliedDate: string;
+  applicationFormData?: any;
 }
 
 const AppliedJobs: React.FC = () => {
@@ -43,6 +44,8 @@ const AppliedJobs: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<string>('');
   const [chartType, setChartType] = useState<string>('line');
   const [timeRange, setTimeRange] = useState<string>('month');
+  const [selectedJob, setSelectedJob] = useState<AppliedJob | null>(null);
+  const [showModal, setShowModal] = useState<boolean>(false);
   const chartRef = useRef<any>(null);
 
   // Generate random colors for charts
@@ -104,6 +107,16 @@ const AppliedJobs: React.FC = () => {
     return appliedJobs.length;
   };
 
+  const handleViewApplication = (job: AppliedJob) => {
+    setSelectedJob(job);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedJob(null);
+  };
+  
   // Process data for charts
   const getChartData = () => {
     // Filter jobs based on time range
@@ -381,6 +394,7 @@ const AppliedJobs: React.FC = () => {
                 <th>Title</th>
                 <th>Company</th>
                 <th>Location</th>
+                <th>View Application</th>
               </tr>
             </thead>
             <tbody>
@@ -390,6 +404,14 @@ const AppliedJobs: React.FC = () => {
                   <td>{job.jobTitle}</td>
                   <td>{job.company}</td>
                   <td>{job.location}</td>
+                  <td>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => handleViewApplication(job)}
+                    >
+                      View Details
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -398,6 +420,274 @@ const AppliedJobs: React.FC = () => {
           <p>No applied jobs found.</p>
         )}
       </div>
+      
+      {/* Application Details Modal */}
+      {showModal && selectedJob && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Application Details</h2>
+              <button className="modal-close" onClick={closeModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="job-info">
+                <h3>{selectedJob.jobTitle}</h3>
+                <p><strong>Company:</strong> {selectedJob.company}</p>
+                <p><strong>Location:</strong> {selectedJob.location}</p>
+                <p><strong>Applied Date:</strong> {selectedJob.appliedDate}</p>
+              </div>
+              
+              {selectedJob.applicationFormData ? (
+                <div className="form-data">
+                  <h4>Submitted Form Data</h4>
+                  <p><strong>Submitted At:</strong> {new Date(selectedJob.applicationFormData.submittedAt).toLocaleString()}</p>
+                  
+                  {selectedJob.applicationFormData.inputs.length > 0 && (
+                    <div className="form-section">
+                      <h5>Input Fields</h5>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Type</th>
+                            <th>Label/Question</th>
+                            <th>Value</th>
+                            <th>Placeholder</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedJob.applicationFormData.inputs.map((input: any, index: number) => {
+                            // Try to extract a meaningful label from the input name or nearby elements
+                            let label = input.name || 'N/A';
+                            
+                            // If the name is a URN, try to find a better label
+                            if (label.startsWith('urn:li:')) {
+                              // Extract a human-readable part from the URN if possible
+                              const urnParts = label.split(':');
+                              if (urnParts.length > 2) {
+                                // Try to get the last meaningful part
+                                const lastPart = urnParts[urnParts.length - 1];
+                                if (lastPart.includes('(') && lastPart.includes(')')) {
+                                  const innerPart = lastPart.substring(lastPart.indexOf('(') + 1, lastPart.lastIndexOf(')'));
+                                  const innerParts = innerPart.split(',');
+                                  if (innerParts.length > 2) {
+                                    // This might be a question identifier, show the type part
+                                    label = innerParts[2] || 'Multiple Choice Question';
+                                  } else {
+                                    label = 'Form Field';
+                                  }
+                                } else {
+                                  label = lastPart;
+                                }
+                              }
+                            }
+                            
+                            // For generic labels, try to infer from type
+                            if (label === 'N/A' || label.startsWith('urn:li:')) {
+                              switch (input.type) {
+                                case 'text':
+                                  label = 'Text Input';
+                                  break;
+                                case 'email':
+                                  label = 'Email Address';
+                                  break;
+                                case 'tel':
+                                  label = 'Phone Number';
+                                  break;
+                                case 'file':
+                                  label = 'File Upload';
+                                  break;
+                                case 'textarea':
+                                  label = 'Text Area';
+                                  break;
+                                case 'radio':
+                                  label = 'Radio Button';
+                                  break;
+                                case 'checkbox':
+                                  label = 'Checkbox';
+                                  break;
+                                default:
+                                  label = input.type ? `${input.type.charAt(0).toUpperCase() + input.type.slice(1)} Field` : 'Unknown Field';
+                              }
+                            }
+                            
+                            // Special handling for common fields
+                            if (input.placeholder) {
+                              if (input.placeholder.toLowerCase().includes('first name') || 
+                                  input.placeholder.toLowerCase().includes('given name')) {
+                                label = 'First Name';
+                              } else if (input.placeholder.toLowerCase().includes('last name') || 
+                                         input.placeholder.toLowerCase().includes('surname') ||
+                                         input.placeholder.toLowerCase().includes('family name')) {
+                                label = 'Last Name';
+                              } else if (input.placeholder.toLowerCase().includes('phone') || 
+                                         input.placeholder.toLowerCase().includes('mobile')) {
+                                label = 'Phone Number';
+                              } else if (input.placeholder.toLowerCase().includes('email')) {
+                                label = 'Email Address';
+                              }
+                            }
+                            
+                            return (
+                              <tr key={index}>
+                                <td>{input.type}</td>
+                                <td>{label}</td>
+                                <td>{input.value || 'N/A'}</td>
+                                <td>{input.placeholder || 'N/A'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  
+                  {selectedJob.applicationFormData.radios.length > 0 && (
+                    <div className="form-section">
+                      <h5>Radio Buttons</h5>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Question</th>
+                            <th>Selected Answer</th>
+                            <th>All Options</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedJob.applicationFormData.radios.map((radio: any, index: number) => {
+                            // Try to create a more user-friendly question label
+                            let questionLabel = radio.name || 'Multiple Choice Question';
+                            
+                            // Improve URN-based labels
+                            if (questionLabel.startsWith('urn:li:') && radio.options && radio.options.length > 0) {
+                              // Try to infer question from options if they have meaningful text
+                              const optionTexts = radio.options.map((opt: any) => opt.text || opt.value).filter(Boolean);
+                              if (optionTexts.length > 0) {
+                                // If options are meaningful, we might be able to guess the question
+                                if (optionTexts.some((t: string) => 
+                                  t.toLowerCase().includes('yes') || t.toLowerCase().includes('no'))) {
+                                  questionLabel = 'Yes/No Question';
+                                } else if (optionTexts.some((t: string) => 
+                                  t.toLowerCase().includes('male') || t.toLowerCase().includes('female'))) {
+                                  questionLabel = 'Gender Selection';
+                                } else {
+                                  questionLabel = 'Multiple Choice Question';
+                                }
+                              }
+                            }
+                            
+                            return (
+                              <tr key={index}>
+                                <td>{questionLabel}</td>
+                                <td>{radio.selectedValue || 'N/A'}</td>
+                                <td>
+                                  {radio.options && radio.options.map((opt: any, optIndex: number) => (
+                                    <span key={optIndex}>
+                                      {opt.text || opt.value}{optIndex < radio.options.length - 1 ? ', ' : ''}
+                                    </span>
+                                  ))}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  
+                  {selectedJob.applicationFormData.dropdowns.length > 0 && (
+                    <div className="form-section">
+                      <h5>Dropdowns</h5>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Field Name</th>
+                            <th>Selected Value</th>
+                            <th>Available Options</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedJob.applicationFormData.dropdowns.map((dropdown: any, index: number) => {
+                            // Try to create a more user-friendly field name
+                            let fieldName = dropdown.name || 'Dropdown Selection';
+                            
+                            // Improve URN-based labels
+                            if (fieldName.startsWith('urn:li:')) {
+                              // Try to extract meaningful name from URN
+                              const urnParts = fieldName.split(':');
+                              if (urnParts.length > 2) {
+                                const lastPart = urnParts[urnParts.length - 1];
+                                if (lastPart.includes('(') && lastPart.includes(')')) {
+                                  const innerPart = lastPart.substring(lastPart.indexOf('(') + 1, lastPart.lastIndexOf(')'));
+                                  const innerParts = innerPart.split(',');
+                                  if (innerParts.length > 2) {
+                                    fieldName = innerParts[2] || 'Selection Field';
+                                  } else {
+                                    fieldName = 'Dropdown Field';
+                                  }
+                                } else {
+                                  fieldName = lastPart.replace(/([A-Z])/g, ' $1').trim();
+                                }
+                              }
+                            }
+                            
+                            // Special handling for common dropdowns
+                            if (dropdown.options && dropdown.options.length > 0) {
+                              const optionTexts = dropdown.options.map((opt: any) => opt.text || opt.value);
+                              
+                              // Check for country dropdowns
+                              if (optionTexts.some((t: string) => 
+                                ['India', 'United States', 'Canada', 'United Kingdom'].includes(t))) {
+                                fieldName = 'Country Selection';
+                              } 
+                              // Check for state/province dropdowns
+                              else if (optionTexts.some((t: string) => 
+                                ['California', 'Texas', 'New York', 'Ontario', 'British Columbia'].includes(t))) {
+                                fieldName = 'State/Province Selection';
+                              }
+                              // Check for year dropdowns
+                              else if (optionTexts.every((t: string) => !isNaN(Number(t)) && Number(t) > 1900 && Number(t) < 2100)) {
+                                fieldName = 'Year Selection';
+                              }
+                            }
+                            
+                            return (
+                              <tr key={index}>
+                                <td>{fieldName}</td>
+                                <td>{dropdown.selectedValue || 'N/A'}</td>
+                                <td>
+                                  {dropdown.options && dropdown.options.length > 0 ? (
+                                    <>
+                                      {dropdown.options.slice(0, 5).map((opt: any, optIndex: number) => (
+                                        <span key={optIndex}>
+                                          {opt.text || opt.value}{optIndex < Math.min(4, dropdown.options.length - 1) ? ', ' : ''}
+                                        </span>
+                                      ))}
+                                      {dropdown.options.length > 5 && (
+                                        <span>... and {dropdown.options.length - 5} more</span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    'No options available'
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p>No form data available for this application.</p>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={closeModal}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="info-section">
         <h3>About Applied Jobs</h3>
