@@ -33,7 +33,7 @@ interface AppliedJob {
   jobTitle: string;
   company: string;
   location: string;
-  appliedDate: string;
+  appliedDate: string; // Now stores full ISO timestamp
   applicationFormData?: any;
 }
 
@@ -63,38 +63,50 @@ const AppliedJobs: React.FC = () => {
     chrome.storage.local.get(['appliedJobs'], (result) => {
       if (result.appliedJobs) {
         const jobs: AppliedJob[] = [];
-        Object.keys(result.appliedJobs).forEach(date => {
-          result.appliedJobs[date].forEach((job: AppliedJob) => {
-            jobs.push({
-              ...job,
-              appliedDate: new Date(job.appliedDate).toISOString().split('T')[0] // Normalize date format
+        // Extract all jobs from the grouped storage structure
+        Object.keys(result.appliedJobs).forEach(dateKey => {
+          if (Array.isArray(result.appliedJobs[dateKey])) {
+            result.appliedJobs[dateKey].forEach((job: AppliedJob) => {
+              jobs.push({
+                ...job,
+                // Ensure we have a valid appliedDate string
+                appliedDate: job.appliedDate || dateKey
+              });
             });
-          });
+          }
         });
+
+        // Sort by date descending (latest first)
+        jobs.sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime());
+
         setAppliedJobs(jobs);
         setFilteredJobs(jobs);
+        console.log(`Loaded ${jobs.length} jobs, latest is ${jobs[0]?.jobTitle}`);
       }
     });
   }, []);
 
   useEffect(() => {
     // Apply filters
-    let filtered = appliedJobs;
-    
+    let filtered = [...appliedJobs];
+
     if (searchTerm) {
-      filtered = filtered.filter(job => 
-        job.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.location.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(job =>
+        job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.location?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (dateFilter) {
-      filtered = filtered.filter(job => 
-        job.appliedDate === dateFilter
+      filtered = filtered.filter(job =>
+        job.appliedDate.startsWith(dateFilter)
       );
     }
-    
+
+    // Ensure sorting is preserved after filtering
+    filtered.sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime());
+
     setFilteredJobs(filtered);
   }, [searchTerm, dateFilter, appliedJobs]);
 
@@ -116,34 +128,35 @@ const AppliedJobs: React.FC = () => {
     setShowModal(false);
     setSelectedJob(null);
   };
-  
+
   // Process data for charts
   const getChartData = () => {
     // Filter jobs based on time range
     const now = new Date();
     let filteredJobsByTime = [...appliedJobs];
-    
+
     if (timeRange === 'day') {
       const today = now.toISOString().split('T')[0];
-      filteredJobsByTime = appliedJobs.filter(job => job.appliedDate === today);
+      filteredJobsByTime = appliedJobs.filter(job => job.appliedDate.startsWith(today));
     } else if (timeRange === 'week') {
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredJobsByTime = appliedJobs.filter(job => 
+      filteredJobsByTime = appliedJobs.filter(job =>
         new Date(job.appliedDate) >= oneWeekAgo
       );
     } else if (timeRange === 'month') {
       const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-      filteredJobsByTime = appliedJobs.filter(job => 
+      filteredJobsByTime = appliedJobs.filter(job =>
         new Date(job.appliedDate) >= oneMonthAgo
       );
     }
-    
+
     // Prepare data for time-based chart
     const dateCounts: Record<string, number> = {};
     filteredJobsByTime.forEach(job => {
-      dateCounts[job.appliedDate] = (dateCounts[job.appliedDate] || 0) + 1;
+      const datePart = job.appliedDate.split('T')[0];
+      dateCounts[datePart] = (dateCounts[datePart] || 0) + 1;
     });
-    
+
     const sortedDates = Object.keys(dateCounts).sort();
     const chartData = {
       labels: sortedDates,
@@ -156,42 +169,42 @@ const AppliedJobs: React.FC = () => {
         fill: chartType === 'line'
       }]
     };
-    
+
     return chartData;
   };
 
   // Process data for location-based charts
   const getLocationChartData = () => {
     const locationCounts: Record<string, number> = {};
-    
+
     // Filter jobs based on current filters
     let jobsToProcess = [...filteredJobs];
-    
+
     // Apply time range filter for location chart as well
     const now = new Date();
     if (timeRange === 'day') {
       const today = now.toISOString().split('T')[0];
-      jobsToProcess = jobsToProcess.filter(job => job.appliedDate === today);
+      jobsToProcess = jobsToProcess.filter(job => job.appliedDate.startsWith(today));
     } else if (timeRange === 'week') {
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      jobsToProcess = jobsToProcess.filter(job => 
+      jobsToProcess = jobsToProcess.filter(job =>
         new Date(job.appliedDate) >= oneWeekAgo
       );
     } else if (timeRange === 'month') {
       const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-      jobsToProcess = jobsToProcess.filter(job => 
+      jobsToProcess = jobsToProcess.filter(job =>
         new Date(job.appliedDate) >= oneMonthAgo
       );
     }
-    
+
     jobsToProcess.forEach(job => {
       locationCounts[job.location] = (locationCounts[job.location] || 0) + 1;
     });
-    
+
     const locations = Object.keys(locationCounts);
     const counts = locations.map(location => locationCounts[location]);
     const colors = generateColors(locations.length);
-    
+
     const barData = {
       labels: locations,
       datasets: [{
@@ -202,7 +215,7 @@ const AppliedJobs: React.FC = () => {
         borderWidth: 1
       }]
     };
-    
+
     const pieData = {
       labels: locations,
       datasets: [{
@@ -212,7 +225,7 @@ const AppliedJobs: React.FC = () => {
         borderWidth: 1
       }]
     };
-    
+
     return { barData, pieData, locationCounts };
   };
 
@@ -280,7 +293,7 @@ const AppliedJobs: React.FC = () => {
       },
       tooltip: {
         callbacks: {
-          label: function(context: any) {
+          label: function (context: any) {
             const label = context.label || '';
             const count = context.raw || 0;
             const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
@@ -295,11 +308,11 @@ const AppliedJobs: React.FC = () => {
   return (
     <div className="applied-jobs">
       <h2>Applied Jobs</h2>
-      
+
       <div className="stats">
         <h3>Total Jobs Applied: {getTotalJobsCount()}</h3>
       </div>
-      
+
       <div className="chart-controls">
         <div className="form-group">
           <label htmlFor="chart-type">Chart Type:</label>
@@ -313,7 +326,7 @@ const AppliedJobs: React.FC = () => {
             <option value="pie">Pie Chart</option>
           </select>
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="time-range">Time Range:</label>
           <select
@@ -328,7 +341,7 @@ const AppliedJobs: React.FC = () => {
           </select>
         </div>
       </div>
-      
+
       <div className="chart-container">
         {chartType === 'line' && (
           <Line data={chartData} options={lineChartOptions} />
@@ -340,7 +353,7 @@ const AppliedJobs: React.FC = () => {
           <Pie data={pieData} options={pieChartOptions} />
         )}
       </div>
-      
+
       <div className="location-stats">
         <h3>Location Distribution</h3>
         <ul>
@@ -353,7 +366,7 @@ const AppliedJobs: React.FC = () => {
             ))}
         </ul>
       </div>
-      
+
       <div className="filters">
         <div className="form-group">
           <label htmlFor="search">Search:</label>
@@ -365,7 +378,7 @@ const AppliedJobs: React.FC = () => {
             placeholder="Search by title, company, or location"
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="date-filter">Filter by Date:</label>
           <input
@@ -375,15 +388,15 @@ const AppliedJobs: React.FC = () => {
             onChange={(e) => setDateFilter(e.target.value)}
           />
         </div>
-        
-        <button 
-          className="btn btn-secondary" 
+
+        <button
+          className="btn btn-secondary"
           onClick={handleClearFilters}
         >
           Clear Filters
         </button>
       </div>
-      
+
       <div className="jobs-list">
         <h3>Applied Jobs List ({filteredJobs.length} jobs)</h3>
         {filteredJobs.length > 0 ? (
@@ -400,12 +413,18 @@ const AppliedJobs: React.FC = () => {
             <tbody>
               {filteredJobs.map((job, index) => (
                 <tr key={index}>
-                  <td>{job.appliedDate}</td>
-                  <td>{job.jobTitle}</td>
-                  <td>{job.company}</td>
-                  <td>{job.location}</td>
-                  <td>
-                    <button 
+                  <td className="px-4 py-2 border">{new Date(job.appliedDate).toLocaleString([], {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</td>
+                  <td className="px-4 py-2 border">{job.jobTitle}</td>
+                  <td className="px-4 py-2 border">{job.company}</td>
+                  <td className="px-4 py-2 border">{job.location}</td>
+                  <td className="px-4 py-2 border">
+                    <button
                       className="btn btn-primary"
                       onClick={() => handleViewApplication(job)}
                     >
@@ -420,7 +439,7 @@ const AppliedJobs: React.FC = () => {
           <p>No applied jobs found.</p>
         )}
       </div>
-      
+
       {/* Application Details Modal */}
       {showModal && selectedJob && (
         <div className="modal-overlay" onClick={closeModal}>
@@ -436,12 +455,12 @@ const AppliedJobs: React.FC = () => {
                 <p><strong>Location:</strong> {selectedJob.location}</p>
                 <p><strong>Applied Date:</strong> {selectedJob.appliedDate}</p>
               </div>
-              
+
               {selectedJob.applicationFormData ? (
-                <div className="form-data">
-                  <h4>Submitted Form Data</h4>
+                <div className="mt-4">
+                  <h3 className="font-bold mb-2">Application Details</h3>
                   <p><strong>Submitted At:</strong> {new Date(selectedJob.applicationFormData.submittedAt).toLocaleString()}</p>
-                  
+
                   {selectedJob.applicationFormData.inputs.length > 0 && (
                     <div className="form-section">
                       <h5>Input Fields</h5>
@@ -458,7 +477,7 @@ const AppliedJobs: React.FC = () => {
                           {selectedJob.applicationFormData.inputs.map((input: any, index: number) => {
                             // Try to extract a meaningful label from the input name or nearby elements
                             let label = input.name || 'N/A';
-                            
+
                             // If the name is a URN, try to find a better label
                             if (label.startsWith('urn:li:')) {
                               // Extract a human-readable part from the URN if possible
@@ -480,7 +499,7 @@ const AppliedJobs: React.FC = () => {
                                 }
                               }
                             }
-                            
+
                             // For generic labels, try to infer from type
                             if (label === 'N/A' || label.startsWith('urn:li:')) {
                               switch (input.type) {
@@ -509,24 +528,24 @@ const AppliedJobs: React.FC = () => {
                                   label = input.type ? `${input.type.charAt(0).toUpperCase() + input.type.slice(1)} Field` : 'Unknown Field';
                               }
                             }
-                            
+
                             // Special handling for common fields
                             if (input.placeholder) {
-                              if (input.placeholder.toLowerCase().includes('first name') || 
-                                  input.placeholder.toLowerCase().includes('given name')) {
+                              if (input.placeholder.toLowerCase().includes('first name') ||
+                                input.placeholder.toLowerCase().includes('given name')) {
                                 label = 'First Name';
-                              } else if (input.placeholder.toLowerCase().includes('last name') || 
-                                         input.placeholder.toLowerCase().includes('surname') ||
-                                         input.placeholder.toLowerCase().includes('family name')) {
+                              } else if (input.placeholder.toLowerCase().includes('last name') ||
+                                input.placeholder.toLowerCase().includes('surname') ||
+                                input.placeholder.toLowerCase().includes('family name')) {
                                 label = 'Last Name';
-                              } else if (input.placeholder.toLowerCase().includes('phone') || 
-                                         input.placeholder.toLowerCase().includes('mobile')) {
+                              } else if (input.placeholder.toLowerCase().includes('phone') ||
+                                input.placeholder.toLowerCase().includes('mobile')) {
                                 label = 'Phone Number';
                               } else if (input.placeholder.toLowerCase().includes('email')) {
                                 label = 'Email Address';
                               }
                             }
-                            
+
                             return (
                               <tr key={index}>
                                 <td>{input.type}</td>
@@ -540,7 +559,7 @@ const AppliedJobs: React.FC = () => {
                       </table>
                     </div>
                   )}
-                  
+
                   {selectedJob.applicationFormData.radios.length > 0 && (
                     <div className="form-section">
                       <h5>Radio Buttons</h5>
@@ -556,17 +575,17 @@ const AppliedJobs: React.FC = () => {
                           {selectedJob.applicationFormData.radios.map((radio: any, index: number) => {
                             // Try to create a more user-friendly question label
                             let questionLabel = radio.name || 'Multiple Choice Question';
-                            
+
                             // Improve URN-based labels
                             if (questionLabel.startsWith('urn:li:') && radio.options && radio.options.length > 0) {
                               // Try to infer question from options if they have meaningful text
                               const optionTexts = radio.options.map((opt: any) => opt.text || opt.value).filter(Boolean);
                               if (optionTexts.length > 0) {
                                 // If options are meaningful, we might be able to guess the question
-                                if (optionTexts.some((t: string) => 
+                                if (optionTexts.some((t: string) =>
                                   t.toLowerCase().includes('yes') || t.toLowerCase().includes('no'))) {
                                   questionLabel = 'Yes/No Question';
-                                } else if (optionTexts.some((t: string) => 
+                                } else if (optionTexts.some((t: string) =>
                                   t.toLowerCase().includes('male') || t.toLowerCase().includes('female'))) {
                                   questionLabel = 'Gender Selection';
                                 } else {
@@ -574,7 +593,7 @@ const AppliedJobs: React.FC = () => {
                                 }
                               }
                             }
-                            
+
                             return (
                               <tr key={index}>
                                 <td>{questionLabel}</td>
@@ -593,7 +612,7 @@ const AppliedJobs: React.FC = () => {
                       </table>
                     </div>
                   )}
-                  
+
                   {selectedJob.applicationFormData.dropdowns.length > 0 && (
                     <div className="form-section">
                       <h5>Dropdowns</h5>
@@ -602,14 +621,14 @@ const AppliedJobs: React.FC = () => {
                           <tr>
                             <th>Field Name</th>
                             <th>Selected Value</th>
-                            <th>Available Options</th>
+                            <th>Options</th>
                           </tr>
                         </thead>
                         <tbody>
                           {selectedJob.applicationFormData.dropdowns.map((dropdown: any, index: number) => {
                             // Try to create a more user-friendly field name
                             let fieldName = dropdown.name || 'Dropdown Selection';
-                            
+
                             // Improve URN-based labels
                             if (fieldName.startsWith('urn:li:')) {
                               // Try to extract meaningful name from URN
@@ -629,18 +648,18 @@ const AppliedJobs: React.FC = () => {
                                 }
                               }
                             }
-                            
+
                             // Special handling for common dropdowns
                             if (dropdown.options && dropdown.options.length > 0) {
                               const optionTexts = dropdown.options.map((opt: any) => opt.text || opt.value);
-                              
+
                               // Check for country dropdowns
-                              if (optionTexts.some((t: string) => 
+                              if (optionTexts.some((t: string) =>
                                 ['India', 'United States', 'Canada', 'United Kingdom'].includes(t))) {
                                 fieldName = 'Country Selection';
-                              } 
+                              }
                               // Check for state/province dropdowns
-                              else if (optionTexts.some((t: string) => 
+                              else if (optionTexts.some((t: string) =>
                                 ['California', 'Texas', 'New York', 'Ontario', 'British Columbia'].includes(t))) {
                                 fieldName = 'State/Province Selection';
                               }
@@ -649,7 +668,16 @@ const AppliedJobs: React.FC = () => {
                                 fieldName = 'Year Selection';
                               }
                             }
-                            
+
+                            // Determine how the field was filled
+                            let filledBy = 'Unknown';
+                            if (dropdown.status) {
+                              filledBy = dropdown.status.filledBy === 'ai' ? 'AI' : 'System (Validation)';
+                            } else if (dropdown.selectedValue) {
+                              // If there's a value but no status, it might be pre-filled
+                              filledBy = 'Pre-filled';
+                            }
+
                             return (
                               <tr key={index}>
                                 <td>{fieldName}</td>
@@ -663,7 +691,7 @@ const AppliedJobs: React.FC = () => {
                                         </span>
                                       ))}
                                       {dropdown.options.length > 5 && (
-                                        <span>... and {dropdown.options.length - 5} more</span>
+                                        <span>... +{dropdown.options.length - 5} more</span>
                                       )}
                                     </>
                                   ) : (
@@ -688,7 +716,7 @@ const AppliedJobs: React.FC = () => {
           </div>
         </div>
       )}
-      
+
       <div className="info-section">
         <h3>About Applied Jobs</h3>
         <p>

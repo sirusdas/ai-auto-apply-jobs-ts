@@ -332,32 +332,69 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
 
 function constructSearchUrl(keywords: string, location: string, jobType: string): string {
   const baseUrl = 'https://www.linkedin.com/jobs/search/';
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(window.location.search); // Start with current params
 
-  if (keywords) params.set('keywords', keywords);
-  if (location) params.set('location', location);
+  // Always set keywords and location to match user configuration, overriding existing ones
+  if (keywords) {
+    params.set('keywords', keywords);
+  } else {
+    params.delete('keywords');
+  }
+  
+  if (location) {
+    params.set('location', location);
+  } else {
+    params.delete('location');
+  }
 
   const f_JT = mapJobType(jobType);
-  if (f_JT) params.set('f_JT', f_JT);
+  if (f_JT) {
+    params.set('f_JT', f_JT);
+  } else {
+    params.delete('f_JT');
+  }
 
-  // Other standard params
-  params.set('start', '0'); // Reset pagination
-  // Remove geoId and currentJobId implicitly by not adding them
+  // Reset pagination but keep other parameters
+  params.set('start', '0');
+  
+  // Remove geoId and currentJobId if they exist
+  params.delete('geoId');
+  params.delete('currentJobId');
 
   return `${baseUrl}?${params.toString()}`;
 }
 
-function isCurrentUrlMatching(targetUrl: string): boolean {
-  // Simple check: do path and query params match key aspects?
-  // LinkedIn adds many extra params (like tracking), so strict equality fails.
-  // We check if "keywords", "location", "f_JT" match if they exist in target.
+function preserveCustomSearchParams(targetUrl: string): string {
+  // Preserve ALL search parameters from current URL when constructing target URL
+  // This ensures we keep all user's custom search filters
+  const currentUrl = new URL(window.location.href);
+  const target = new URL(targetUrl);
+  
+  // Copy ALL parameters from current URL to target URL
+  for (const [key, value] of currentUrl.searchParams.entries()) {
+    // Don't override the core search parameters that we explicitly set
+    if (!target.searchParams.has(key)) {
+      target.searchParams.set(key, value);
+    }
+  }
+  
+  return target.toString();
+}
 
+function isCurrentUrlMatching(targetUrl: string): boolean {
+  // More flexible check: do essential path and query params match?
   const currentUrl = new URL(window.location.href);
   const target = new URL(targetUrl);
 
-  const keysToCheck = ['keywords', 'location', 'f_JT'];
+  // Check if we're on the same base path
+  if (currentUrl.pathname !== target.pathname) {
+    return false;
+  }
 
-  for (const key of keysToCheck) {
+  // Check if essential parameters match
+  const essentialKeys = ['keywords', 'location'];
+  
+  for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
     const currentVal = currentUrl.searchParams.get(key);
 
@@ -367,10 +404,7 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
 
     if (t !== c) {
       // Allow slight fuzzy match for location? LinkedIn often auto-formats locations.
-      // e.g. "United States" vs "United States" -> exact
-      // "San Francisco" vs "San Francisco, CA" -> mismatch
-      // For now, strict check but allow if target is empty
-      if (t !== '') return false;
+      if (t !== '' && c !== '') return false;
     }
   }
 
@@ -867,11 +901,19 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
             resolve(response.data);
           } else {
             console.error(response);
-            reject(new Error(response?.error || 'Unknown error'));
+            // Even if there's an error with the matching, we shouldn't necessarily skip the job
+            // Instead, we'll return a neutral score that allows processing to continue
+            resolve(null);
           }
         }
       );
     });
+
+    // If we received null (error case), return a neutral score to allow continuation
+    if (response === null) {
+      console.log('Job matching service unavailable, proceeding with neutral score');
+      return 3; // Return a middle score to allow processing
+    }
 
     // Type check
     if (response.company_type) {
@@ -894,11 +936,14 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
       matchScore = Math.round(response);
     } else if (response.matchScore) {
       matchScore = typeof response.matchScore === 'string' ? parseInt(response.matchScore) : response.matchScore;
+    } else if (response.score) {
+      matchScore = typeof response.score === 'string' ? parseInt(response.score) : response.score;
     }
 
+    // If we couldn't parse a score, return a neutral one
     if (matchScore === null || isNaN(matchScore)) {
-      console.error('Invalid match score in response:', response);
-      return false;
+      console.log('Could not parse match score, using neutral score');
+      return 3;
     }
 
     console.log(`Final match score: ${matchScore}, Minimum required: ${minScore}`);
@@ -906,7 +951,9 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
 
   } catch (e) {
     console.error('Match check error', e);
-    return false; // Fail safe
+    // Even if there's an exception, we shouldn't necessarily skip the job
+    // Return a neutral score to allow processing to continue
+    return 3;
   }
 }
 
@@ -1086,19 +1133,24 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     // Check if job matches criteria
     const matchScore = await checkJobMatch(jobDetailsData);
     console.log(`Job match score: ${matchScore}`);
-    if (matchScore === false || matchScore === null || matchScore === undefined) {
+    
+    // Only skip if we explicitly get false, not for other falsy values like null or 0
+    if (matchScore === false) {
       console.log('Job does not match criteria. Skipping.');
       return;
     }
-
-    // Check if match score meets minimum requirement
-    const minScoreResult = await chrome.storage.local.get(['minMatchScore']);
-    const minScore = parseInt(minScoreResult.minMatchScore || '3');
-    console.log(`Minimum required score: ${minScore}, Actual score: ${matchScore}`);
     
-    if (matchScore < minScore) {
-      console.log(`Job match score (${matchScore}) below minimum (${minScore}). Skipping.`);
-      return;
+    // If we have a numeric score (including 0), check against minimum
+    if (typeof matchScore === 'number') {
+      // Check if match score meets minimum requirement
+      const minScoreResult = await chrome.storage.local.get(['minMatchScore']);
+      const minScore = parseInt(minScoreResult.minMatchScore || '3');
+      console.log(`Minimum required score: ${minScore}, Actual score: ${matchScore}`);
+      
+      if (matchScore < minScore) {
+        console.log(`Job match score (${matchScore}) below minimum (${minScore}). Skipping.`);
+        return;
+      }
     }
 
     console.log(`Job match score: ${matchScore}. Proceeding to apply...`);

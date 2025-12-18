@@ -62,10 +62,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'answerJobQuestions') {
-    const { inputs, radios, dropdowns, resume, accessToken } = request;
+    const { inputs, radios, dropdowns, checkboxes, resume, accessToken } = request;
     console.log('Received answerJobQuestions request');
 
-    handleQuestionAnswering(inputs, radios, dropdowns, resume, accessToken)
+    handleQuestionAnswering(inputs, radios, dropdowns, checkboxes, resume, accessToken)
       .then((data) => {
         sendResponse({ success: true, data });
       })
@@ -334,10 +334,11 @@ B.S. Computer Science | University of Technology | 2013 - 2017
 }
 
 async function handleQuestionAnswering(
-  inputs: any[], 
-  radios: any[], 
-  dropdowns: any[], 
-  resume: string, 
+  inputs: any[],
+  radios: any[],
+  dropdowns: any[],
+  checkboxes: any[],
+  resume: string,
   accessToken: string
 ) {
 
@@ -345,7 +346,7 @@ async function handleQuestionAnswering(
     throw new Error('Access token (API Key) not provided');
   }
 
-  const promptText = `Do not specify resume in solution and when asked for numbers give pure numbers without any words.Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} Resume: ${resume}`;
+  const promptText = `Do not specify resume in solution and when asked for numbers give pure numbers without any words.Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)} Resume: ${resume}`;
 
   console.log('Sending question answering request to Gemini API...');
 
@@ -399,7 +400,8 @@ async function handleQuestionAnswering(
     return {
       inputs: parsedContent.inputs || {},
       dropdowns: parsedContent.dropdowns || {},
-      radios: parsedContent.radios || {}
+      radios: parsedContent.radios || {},
+      checkboxes: parsedContent.checkboxes || {}
     };
 
   } catch (e: any) {
