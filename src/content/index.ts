@@ -32,6 +32,7 @@ interface AutoApplyState {
   typeIndex: number;
   startTime: number;     // Timestamp when current segment started
   segmentDuration: number; // Total duration intended for this segment in ms
+  configs: JobConfig[];  // Store configs for easy access
 }
 
 // Global variables
@@ -188,11 +189,13 @@ async function startNewAutoApplyProcess() {
     locationIndex: 0,
     typeIndex: 0,
     startTime: Date.now(),
-    segmentDuration: 0 // Will be calculated
+    segmentDuration: 0, // Will be calculated
+    configs: []
   };
 
   // Calculate duration for first segment
   newState.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0);
+  newState.configs = configs;
 
   saveState(newState);
 
@@ -796,7 +799,12 @@ async function goToNextPage() {
     }
   } else {
     console.log('No next page found.');
-    stopAutoApplyProcess();
+    if (currentState) {
+      moveToNextSegment(currentState, currentState.configs);
+    } else {
+      console.warn('Cannot move to next segment: no current state available.');
+    }
+    //stopAutoApplyProcess();
   }
 }
 
