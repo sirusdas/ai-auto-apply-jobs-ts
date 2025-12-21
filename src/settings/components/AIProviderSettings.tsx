@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AISettings, AIProvider } from '../../types';
+import ModelSelector from './ModelSelector';
 
 const AIProviderSettings: React.FC = () => {
     const [settings, setSettings] = useState<AISettings>({
@@ -97,12 +98,11 @@ const AIProviderSettings: React.FC = () => {
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor={`${provider.id}-model`}>Model:</label>
-                                    <input
-                                        type="text"
-                                        id={`${provider.id}-model`}
-                                        value={provider.model}
-                                        onChange={(e) => handleProviderChange(provider.id, 'model', e.target.value)}
-                                        placeholder="e.g. gpt-4o, claude-3-sonnet"
+                                    <ModelSelector
+                                        providerId={provider.id}
+                                        selectedModel={provider.model || ''}
+                                        onModelChange={(model) => handleProviderChange(provider.id, 'model', model)}
+                                        disabled={!provider.enabled}
                                     />
                                 </div>
                                 <div className="form-group">
@@ -119,6 +119,30 @@ const AIProviderSettings: React.FC = () => {
                         )}
                     </div>
                 ))}
+            </div>
+
+            <div className="notice-card card warning-notice">
+                <div className="notice-header">
+                    <span className="notice-icon">⚠️</span>
+                    <h3>Important Notice About Paid Models</h3>
+                </div>
+                <div className="notice-content">
+                    <p>Many AI models listed here require paid subscriptions or API credits:</p>
+                    <ul>
+                        <li><strong>Free models</strong> (like Gemini Flash/Pro) are clearly marked and can be used immediately with a free API key.</li>
+                        <li><strong>Paid models</strong> (Claude, GPT-4o, etc.) require you to purchase API access directly from the provider.</li>
+                        <li>This extension <strong>does not</strong> provide or pay for AI API access.</li>
+                        <li>Please ensure you have active API credits before selecting a paid model.</li>
+                    </ul>
+                    <div className="pricing-links">
+                        <p><strong>Official Pricing Pages:</strong></p>
+                        <div className="links-grid">
+                            <a href="https://ai.google.dev/pricing" target="_blank" rel="noreferrer">Google Gemini</a>
+                            <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer">Anthropic Claude</a>
+                            <a href="https://openai.com/api/pricing" target="_blank" rel="noreferrer">OpenAI GPT</a>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="actions">
@@ -141,6 +165,51 @@ const AIProviderSettings: React.FC = () => {
           padding: 16px;
           margin-bottom: 20px;
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .warning-notice {
+          border-left: 4px solid #f59e0b;
+          background: #fffbeb;
+        }
+        .notice-header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .notice-header h3 {
+          margin: 0;
+          color: #92400e;
+          font-size: 1.1em;
+        }
+        .notice-icon {
+          font-size: 1.2em;
+        }
+        .notice-content {
+          font-size: 0.9em;
+          color: #92400e;
+          line-height: 1.5;
+        }
+        .notice-content ul {
+          margin: 10px 0;
+          padding-left: 20px;
+        }
+        .pricing-links {
+          margin-top: 15px;
+          padding-top: 12px;
+          border-top: 1px solid #fde68a;
+        }
+        .links-grid {
+          display: flex;
+          gap: 15px;
+          margin-top: 5px;
+        }
+        .links-grid a {
+          color: #2196F3;
+          text-decoration: none;
+          font-weight: 500;
+        }
+        .links-grid a:hover {
+          text-decoration: underline;
         }
         .provider-header {
           display: flex;
@@ -181,6 +250,33 @@ const AIProviderSettings: React.FC = () => {
           align-items: center;
           gap: 10px;
           font-size: 0.9em;
+        }
+        .actions {
+          margin-top: 20px;
+          display: flex;
+          justify-content: flex-end;
+        }
+        .btn-primary {
+          background-color: #2196F3;
+          color: white;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: bold;
+        }
+        .btn-primary:hover {
+          background-color: #1976D2;
+        }
+        .status-message {
+          margin-top: 15px;
+          padding: 10px;
+          border-radius: 4px;
+          text-align: center;
+        }
+        .status-message.success {
+          background-color: #dcfce7;
+          color: #166534;
         }
       `}} />
         </div>
