@@ -343,7 +343,7 @@ function constructSearchUrl(keywords: string, location: string, jobType: string)
   } else {
     params.delete('keywords');
   }
-  
+
   if (location) {
     params.set('location', location);
   } else {
@@ -359,7 +359,7 @@ function constructSearchUrl(keywords: string, location: string, jobType: string)
 
   // Reset pagination but keep other parameters
   params.set('start', '0');
-  
+
   // Remove geoId and currentJobId if they exist
   params.delete('geoId');
   params.delete('currentJobId');
@@ -372,7 +372,7 @@ function preserveCustomSearchParams(targetUrl: string): string {
   // This ensures we keep all user's custom search filters
   const currentUrl = new URL(window.location.href);
   const target = new URL(targetUrl);
-  
+
   // Copy ALL parameters from current URL to target URL
   for (const [key, value] of currentUrl.searchParams.entries()) {
     // Don't override the core search parameters that we explicitly set
@@ -380,7 +380,7 @@ function preserveCustomSearchParams(targetUrl: string): string {
       target.searchParams.set(key, value);
     }
   }
-  
+
   return target.toString();
 }
 
@@ -396,7 +396,7 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
 
   // Check if essential parameters match
   const essentialKeys = ['keywords', 'location'];
-  
+
   for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
     const currentVal = currentUrl.searchParams.get(key);
@@ -419,25 +419,25 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
   // 1. Next job type within current location
   // 2. Next location within current job config
   // 3. Next job config
-  
+
   // Get current job config to access locations and job types
   const jobConfig = configs[state.jobIndex];
   const locations = (jobConfig.locations && jobConfig.locations.length > 0)
     ? jobConfig.locations
     : [{ locationName: '', locationTimer: '' }];
-    
+
   const jobTypes = (jobConfig.jobTypes && jobConfig.jobTypes.length > 0)
     ? jobConfig.jobTypes
     : [{ jobTypeName: '', jobTypeTimer: '' }];
 
   // Increment type index first
   state.typeIndex++;
-  
+
   // If we've exhausted all types for current location, move to next location
   if (state.typeIndex >= jobTypes.length) {
     state.locationIndex++;
     state.typeIndex = 0;
-    
+
     // If we've exhausted all locations for current job, move to next job
     if (state.locationIndex >= locations.length) {
       state.jobIndex++;
@@ -446,20 +446,20 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
   }
 
   state.startTime = Date.now(); // Reset start time for new segment
-  
+
   // Calculate duration for the next segment
   state.segmentDuration = calculateSegmentDuration(configs, state.jobIndex, state.locationIndex, state.typeIndex);
 
   // Save and process
   saveState(state);
-  
+
   // If we still have more segments, process them
   if (state.jobIndex < configs.length) {
     processCurrentSegment(state, configs);
   } else {
     // All done with current cycle
     console.log('All job configurations completed.');
-    
+
     // Check if we should run in loop
     chrome.storage.local.get(['runInLoop'], (result) => {
       if (result.runInLoop) {
@@ -511,10 +511,10 @@ async function checkDailyLimit(): Promise<boolean> {
 
 async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobDetails: any[] }> {
   console.log('Scrolling and fetching all jobs...');
-  
+
   // Instead of trying to find a container, let's directly find job items and scroll the whole page
   // This is a more robust approach that works regardless of LinkedIn's layout changes
-  
+
   const jobCardSelectors = [
     '.jobs-search-results__list-item',
     '.job-card-container',
@@ -523,23 +523,23 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
     '.scaffold-layout__list-container > li',
     '.jobs-search-results-list__list-item'
   ];
-  
+
   let allJobItems: Element[] = [];
   let previousCount = 0;
   let noChangeCount = 0;
   const maxAttempts = 50; // Increase attempts
   let attempt = 0;
-  
+
   console.log('Starting job discovery and scroll process...');
-  
+
   // Scroll the entire page to load all jobs
   while (attempt < maxAttempts && noChangeCount < 15) {
     // Scroll down by a significant amount (80% of viewport height)
     window.scrollBy(0, window.innerHeight * 0.8);
-    
+
     // Wait for content to load
     await addDelay();
-    
+
     // Find all job items currently on the page
     let currentJobItems: Element[] = [];
     for (const selector of jobCardSelectors) {
@@ -550,9 +550,9 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
         if (items.length > 10) break; // If we found a lot, this is probably the right selector
       }
     }
-    
+
     console.log(`Attempt ${attempt + 1}: Found ${currentJobItems.length} job items`);
-    
+
     // Update our collection of all job items (deduplicating as we go)
     const newItemIds = new Set(allJobItems.map(item => item.outerHTML));
     for (const item of currentJobItems) {
@@ -562,7 +562,7 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
         newItemIds.add(itemId);
       }
     }
-    
+
     // Check if we found more items
     if (allJobItems.length > previousCount) {
       previousCount = allJobItems.length;
@@ -572,22 +572,22 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
       noChangeCount++;
       console.log(`No new items found. No change count: ${noChangeCount}`);
     }
-    
+
     // Check if we've reached the end of the page
     if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 100) {
       console.log('Reached end of page');
       break;
     }
-    
+
     attempt++;
   }
-  
+
   console.log(`Finished scrolling. Found ${allJobItems.length} total unique job items`);
-  
+
   // One final scroll to make sure we got everything
   window.scrollTo(0, document.documentElement.scrollHeight);
   await addDelay();
-  
+
   // Collect all job items one more time after final scroll
   for (const selector of jobCardSelectors) {
     const items = document.querySelectorAll(selector);
@@ -597,23 +597,23 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
       break;
     }
   }
-  
+
   // Extract job details
   const jobDetails: any[] = [];
   const listItems: HTMLElement[] = [];
-  
+
   // Sort items by vertical position
   const sortedItems = [...allJobItems].sort((a, b) => {
     return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
   });
-  
+
   console.log(`Processing ${sortedItems.length} items`);
-  
+
   for (const item of sortedItems) {
     // Scroll item into view to trigger lazy loading
     item.scrollIntoView({ behavior: 'auto', block: 'center' });
     await addVeryShortDelay();
-    
+
     // Try multiple selectors for job title
     const titleSelectors = [
       '.job-card-list__title',
@@ -626,13 +626,13 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
       '.job-card-list__title--link',
       '.job-card-container__primary-description a'
     ];
-    
+
     let titleEl: Element | null = null;
     for (const selector of titleSelectors) {
       titleEl = item.querySelector(selector);
       if (titleEl) break;
     }
-    
+
     // Try multiple selectors for company name
     const companySelectors = [
       '.job-card-container__primary-description',
@@ -645,16 +645,16 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
       '.artdeco-entity-lockup__metadata',
       '.job-card-container__company-name a'
     ];
-    
+
     let companyEl: Element | null = null;
     for (const selector of companySelectors) {
       companyEl = item.querySelector(selector);
       if (companyEl) break;
     }
-    
+
     const jobTitle = titleEl?.textContent?.trim() || '';
     const company = companyEl?.textContent?.trim() || '';
-    
+
     if (jobTitle && company) {
       jobDetails.push({ listItem: item, jobTitle, company });
       listItems.push(item as HTMLElement);
@@ -666,7 +666,7 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
       }
     }
   }
-  
+
   console.log(`Successfully extracted details for ${jobDetails.length} jobs`);
   return { listItems, jobDetails };
 }
@@ -675,10 +675,14 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
   const companies = [...new Set(jobDetails.map(j => j.company))];
   console.log(`Filtering ${companies.length} unique companies...`);
 
-  const tokenRes = await chrome.storage.local.get(['accessToken', 'applyToProductCompanies', 'applyToServiceCompanies']);
+  const storage = await chrome.storage.local.get([
+    'applyToProductCompanies',
+    'applyToServiceCompanies',
+    'apiToken'
+  ]);
 
-  const applyProduct = tokenRes.applyToProductCompanies !== undefined ? tokenRes.applyToProductCompanies : true;
-  const applyService = tokenRes.applyToServiceCompanies !== undefined ? tokenRes.applyToServiceCompanies : true;
+  const applyProduct = storage.applyToProductCompanies !== undefined ? storage.applyToProductCompanies : true;
+  const applyService = storage.applyToServiceCompanies !== undefined ? storage.applyToServiceCompanies : true;
 
   // If both true, no need to filter expensive AI call (unless we strictly want to know type)
   if (applyProduct && applyService) {
@@ -686,8 +690,9 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
     return jobDetails;
   }
 
-  if (!tokenRes.accessToken) {
-    console.warn('No access token for company filtering. Defaulting to all.');
+  const token = storage.apiToken;
+  if (!token) {
+    console.warn('No API token found for company filtering. Defaulting to all.');
     return jobDetails;
   }
 
@@ -696,7 +701,7 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
       chrome.runtime.sendMessage({
         action: 'filterCompanies',
         companies,
-        accessToken: tokenRes.accessToken
+        token: token // Updated param name to match background expected input if needed
       }, (res) => {
         if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
         else if (res && res.success) resolve(res.data);
@@ -830,11 +835,11 @@ async function fetchJobDetails(): Promise<any> {
 
     // Extract job ID from the URL or job title link
     let jobId = null;
-    
+
     // Try to get job ID from URL parameters first
     const urlParams = new URLSearchParams(window.location.search);
     jobId = urlParams.get('currentJobId');
-    
+
     // If not in query params, try to extract from path
     if (!jobId) {
       const match = window.location.pathname.match(/\/jobs\/view\/(\d+)\//);
@@ -842,14 +847,14 @@ async function fetchJobDetails(): Promise<any> {
         jobId = match[1];
       }
     }
-    
+
     // If still no jobId, try to get it from the job title element href if it exists
     if (!jobId && jobTitleElement && jobTitleElement instanceof HTMLAnchorElement) {
       const href = jobTitleElement.href;
       if (href) {
         const hrefParams = new URLSearchParams(new URL(href).search);
         jobId = hrefParams.get('currentJobId');
-        
+
         // If not in query params of href, try to extract from path
         if (!jobId) {
           const hrefMatch = href.match(/\/jobs\/view\/(\d+)\//);
@@ -859,7 +864,7 @@ async function fetchJobDetails(): Promise<any> {
         }
       }
     }
-    
+
     // If still no jobId, try to get it from the Easy Apply button
     if (!jobId) {
       const easyApplyButton = document.querySelector('button[data-job-id]');
@@ -932,7 +937,7 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
 
     // Handle different response formats for match score
     let matchScore = null;
-    
+
     // Try different possible response formats
     if (typeof response.match_score === 'string') {
       matchScore = parseInt(response.match_score);
@@ -968,12 +973,12 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
 async function applyToJob(jobDetails: any) {
   console.log(`-- applyToJob called for ${jobDetails.jobTitle} --`);
   console.log('Job details:', JSON.stringify(jobDetails, null, 2));
-  
+
   try {
     console.log('Searching for Easy Apply buttons...');
     const buttons = Array.from(document.querySelectorAll('button'));
     const easyApplyButtons = buttons.filter(b => b.innerText.includes('Easy Apply'));
-    
+
     console.log(`Found ${buttons.length} total buttons, ${easyApplyButtons.length} Easy Apply buttons`);
 
     if (easyApplyButtons.length > 0) {
@@ -987,7 +992,7 @@ async function applyToJob(jobDetails: any) {
         // Filter for visible buttons
         const visibleButtons = easyApplyButtons.filter(b => b.offsetParent !== null);
         console.log(`Found ${visibleButtons.length} visible Easy Apply buttons`);
-        
+
         if (visibleButtons.length > 0) {
           // If multiple, picking the last one is often safer as the first might be the list item button?
           // The reference said index 1 (second button).
@@ -1003,7 +1008,7 @@ async function applyToJob(jobDetails: any) {
           classes: Array.from(targetBtn.classList),
           id: targetBtn.id
         });
-        
+
         targetBtn.click();
         await addShortDelay();
         console.log('Invoking handleEasyApplyModal...');
@@ -1028,20 +1033,20 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     // Click the job card/list item
     console.log('Clicking job card...');
     const listItem = jobDetails.listItem as HTMLElement;
-    
+
     // Ensure the element is visible and clickable
     listItem.scrollIntoView({ behavior: 'auto', block: 'center' });
     await addVeryShortDelay();
-    
+
     // Try multiple methods to click the job
     let clicked = false;
-    
+
     // Method 1: Find and click the job title link within the item (most reliable)
-    const titleLink = listItem.querySelector('a[href*="/jobs/view/"]') || 
-                      listItem.querySelector('.job-card-list__title a') ||
-                      listItem.querySelector('.artdeco-entity-lockup__title a') ||
-                      listItem.querySelector('a[data-control-name="job_card_title"]');
-    
+    const titleLink = listItem.querySelector('a[href*="/jobs/view/"]') ||
+      listItem.querySelector('.job-card-list__title a') ||
+      listItem.querySelector('.artdeco-entity-lockup__title a') ||
+      listItem.querySelector('a[data-control-name="job_card_title"]');
+
     if (titleLink) {
       try {
         titleLink.scrollIntoView({ behavior: 'auto', block: 'center' });
@@ -1053,7 +1058,7 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
         console.log('Failed to click job title link', e);
       }
     }
-    
+
     // Method 2: Click the list item directly
     if (!clicked) {
       try {
@@ -1064,7 +1069,7 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
         console.log('Failed to click list item directly', e);
       }
     }
-    
+
     // Method 3: Dispatch click event
     if (!clicked) {
       try {
@@ -1092,40 +1097,40 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     const maxRetries = 30; // Increased retries
     const targetTitle = jobDetails.jobTitle.toLowerCase().trim();
     const targetCompany = jobDetails.company.toLowerCase().trim();
-    
+
     // Wait for job details with timeout
     while (retries < maxRetries) {
       await addShortDelay();
-      
+
       // Try to extract job details
       jobDetailsData = await extractJobDetails();
-      
-      if (jobDetailsData && 
-          jobDetailsData.jobTitle && 
-          jobDetailsData.company &&
-          jobDetailsData.jobTitle.trim() !== '' &&
-          jobDetailsData.company.trim() !== '') {
-        
+
+      if (jobDetailsData &&
+        jobDetailsData.jobTitle &&
+        jobDetailsData.company &&
+        jobDetailsData.jobTitle.trim() !== '' &&
+        jobDetailsData.company.trim() !== '') {
+
         const loadedTitle = jobDetailsData.jobTitle.toLowerCase().trim();
         const loadedCompany = jobDetailsData.company.toLowerCase().trim();
-        
+
         // Verify it matches the target job
         const titleMatch = loadedTitle.includes(targetTitle) || targetTitle.includes(loadedTitle);
         const companyMatch = loadedCompany.includes(targetCompany) || targetCompany.includes(loadedCompany);
-        
+
         console.log(`Comparing job details:`);
         console.log(`  Expected: "${targetTitle}" at "${targetCompany}"`);
         console.log(`  Got:      "${loadedTitle}" at "${loadedCompany}"`);
         console.log(`  Title match: ${titleMatch}, Company match: ${companyMatch}`);
-        
+
         // Check for exact matches or strong partial matches
-        if ((titleMatch && companyMatch) || 
-            (loadedTitle === targetTitle && loadedCompany === targetCompany)) {
+        if ((titleMatch && companyMatch) ||
+          (loadedTitle === targetTitle && loadedCompany === targetCompany)) {
           console.log('Correct job details loaded!');
           break;
         }
       }
-      
+
       retries++;
       console.log(`Retry ${retries}/${maxRetries} - Still waiting for correct job details to load...`);
     }
@@ -1141,20 +1146,20 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     // Check if job matches criteria
     const matchScore = await checkJobMatch(jobDetailsData);
     console.log(`Job match score: ${matchScore}`);
-    
+
     // Only skip if we explicitly get false, not for other falsy values like null or 0
     if (matchScore === false) {
       console.log('Job does not match criteria. Skipping.');
       return;
     }
-    
+
     // If we have a numeric score (including 0), check against minimum
     if (typeof matchScore === 'number') {
       // Check if match score meets minimum requirement
       const minScoreResult = await chrome.storage.local.get(['minMatchScore']);
       const minScore = parseInt(minScoreResult.minMatchScore || '3');
       console.log(`Minimum required score: ${minScore}, Actual score: ${matchScore}`);
-      
+
       if (matchScore < minScore) {
         console.log(`Job match score (${matchScore}) below minimum (${minScore}). Skipping.`);
         return;
@@ -1165,7 +1170,7 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
 
     // Apply to the job
     await applyToJob(jobDetailsData);
-    
+
   } catch (e) {
     console.error('Error processing job:', e);
   } finally {
@@ -1186,7 +1191,7 @@ async function extractJobDetails() {
       '.job-details-jobs-unified-top-card__company-name',
       '.jobs-details__main-content .jobs-details-top-card__company-url a'
     ];
-    
+
     let company = '';
     for (const selector of companySelectors) {
       const companyEl = document.querySelector(selector);
@@ -1207,7 +1212,7 @@ async function extractJobDetails() {
       '.jobs-details__main-content .jobs-details-top-card__job-title h1',
       '.job-details-jobs-unified-top-card__job-title'
     ];
-    
+
     let jobTitle = '';
     for (const selector of titleSelectors) {
       const titleEl = document.querySelector(selector);
@@ -1227,7 +1232,7 @@ async function extractJobDetails() {
       '.job-details-jobs-unified-top-card__primary-description span',
       '.jobs-details__main-content .jobs-details-top-card__job-info span'
     ];
-    
+
     let location = '';
     for (const selector of locationSelectors) {
       const locationEl = document.querySelector(selector);
@@ -1251,7 +1256,7 @@ async function extractJobDetails() {
       '.jobs-description__container',
       '.job-details-about-the-job-module'
     ];
-    
+
     let description = '';
     for (const selector of descriptionSelectors) {
       const descEl = document.querySelector(selector);
@@ -1263,11 +1268,11 @@ async function extractJobDetails() {
 
     // Try to get job ID
     let jobId = null;
-    
+
     // Try from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     jobId = urlParams.get('currentJobId');
-    
+
     // Try from URL path
     if (!jobId) {
       const match = window.location.pathname.match(/\/jobs\/view\/(\d+)\//);
@@ -1275,7 +1280,7 @@ async function extractJobDetails() {
         jobId = match[1];
       }
     }
-    
+
     // Try from job details element attributes
     if (!jobId) {
       const jobDetailsElement = document.querySelector('.job-details-jobs-unified-top-card');
@@ -1288,7 +1293,7 @@ async function extractJobDetails() {
     if (jobTitle || company) {
       return { jobTitle, company, location, description, jobId };
     }
-    
+
     return null;
   } catch (e) {
     console.error('Error extracting job details:', e);

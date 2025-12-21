@@ -354,7 +354,15 @@ async function discardApplication() {
 // --- Phase 3: AI Fetch ---
 
 async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise<Answers | null> {
-    const settings = await chrome.storage.local.get(['aiSettings', 'compressedResumeYAML', 'plainTextResume']);
+    const settings = await chrome.storage.local.get(['aiSettings', 'compressedResumeYAML', 'plainTextResume', 'tokenData']);
+
+    // Check if token is valid
+    const tokenData = settings.tokenData;
+    if (!tokenData || !tokenData.valid) {
+        console.warn('API Token is missing or invalid. Please check your settings.');
+        return null;
+    }
+
     if (!settings.aiSettings) {
         console.warn('AI settings not found. Please configure AI providers in settings.');
         return null;
@@ -649,7 +657,8 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
                 type: input.type,
                 name: input.name,
                 value: input.value,
-                placeholder: input.placeholder
+                placeholder: input.placeholder,
+                label: input.label
             });
         });
 
@@ -667,12 +676,18 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
             formData.dropdowns.push({
                 name: select.name,
                 selectedValue: select.value,
-                options: select.options
+                options: select.options,
+                label: select.label
             });
         });
 
-        // Add checkboxes to form data? getFormElements doesn't gather them yet.
-        // We'll skip for now or update getFormElements if needed for logging.
+        // Add checkboxes to form data
+        formElements.checkboxes.forEach((checkbox: any) => {
+            formData.checkboxes.push({
+                name: checkbox.name,
+                checked: checkbox.checked
+            });
+        });
 
         // Fill Data using Answers
         console.log('RealRun: Filling input fields...');
@@ -977,11 +992,19 @@ function getFormElements(modal: HTMLElement) {
     // Process inputs
     inputs.forEach((input) => {
         if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
+            // Skip hidden inputs, radios and checkboxes (handled separately)
+            if (input.type === 'hidden' || input.type === 'radio' || input.type === 'checkbox') return;
+
+            const container = input.closest('.fb-dash-form-element');
+            const label = container?.querySelector('.artdeco-text-input--label, label');
+            const labelText = label?.textContent?.trim() || '';
+
             formElements.inputs.push({
                 type: input.type,
                 name: input.name,
                 value: input.value,
-                placeholder: input.placeholder
+                placeholder: input.placeholder,
+                label: labelText
             });
         }
     });
@@ -989,9 +1012,14 @@ function getFormElements(modal: HTMLElement) {
     // Process selects
     selects.forEach((select) => {
         if (select instanceof HTMLSelectElement) {
+            const container = select.closest('.fb-dash-form-element') || select.parentElement;
+            const label = container?.querySelector('label');
+            const labelText = label?.textContent?.trim() || '';
+
             formElements.selects.push({
                 name: select.name,
                 value: select.value,
+                label: labelText,
                 options: Array.from(select.options).map(opt => ({
                     value: opt.value,
                     text: opt.text,
@@ -1005,7 +1033,7 @@ function getFormElements(modal: HTMLElement) {
     radioGroups.forEach((group) => {
         const radios = group.querySelectorAll('input[type="radio"]');
         const legend = group.querySelector('legend');
-        const legendText = legend?.textContent?.trim();
+        const legendText = legend?.textContent?.trim() || group.querySelector('.fb-dash-form-element__label')?.textContent?.trim();
 
         // Find the selected radio button
         let selectedValue = '';
@@ -1013,13 +1041,16 @@ function getFormElements(modal: HTMLElement) {
 
         radios.forEach(radio => {
             if (radio instanceof HTMLInputElement) {
+                const label = group.querySelector(`label[for="${radio.id}"]`);
+                const optionText = label?.textContent?.trim() || radio.nextSibling?.textContent?.trim() || radio.value;
+
                 options.push({
                     value: radio.value,
-                    text: radio.nextSibling?.textContent?.trim() || radio.value
+                    text: optionText
                 });
 
                 if (radio.checked) {
-                    selectedValue = radio.value;
+                    selectedValue = optionText;
                 }
             }
         });

@@ -1,13 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import TokenSettings from '../popup/components/TokenSettings';
+import TokenSettings from './components/TokenSettings';
 import PersonalInfoSettings from '../popup/components/PersonalInfoSettings';
 import ResumeManagement from '../popup/components/ResumeManagement';
 import JobMatchSettings from '../popup/components/JobMatchSettings';
 import CompanyPreferences from '../popup/components/CompanyPreferences';
 import DelaySettings from '../popup/components/DelaySettings';
 import AppliedJobs from '../popup/components/AppliedJobs';
-import AccessTokenSettings from './components/AccessTokenSettings';
 import FormControlConfigurations from './components/FormControlConfigurations';
 import SearchTimerConfig from './components/SearchTimerConfig';
 import AIProviderSettings from './components/AIProviderSettings';
@@ -185,14 +184,57 @@ function initModeToggles() {
   }
 }
 
+import * as tokenService from '../utils/tokenService';
+
+// Function to update the API status badge
+async function updateApiStatusBadge() {
+  const badge = document.getElementById('api-status-badge');
+  if (!badge) return;
+
+  const tokenData = await tokenService.getTokenData();
+
+  badge.className = 'status-badge'; // Reset classes
+
+  if (!tokenData || !tokenData.valid) {
+    badge.classList.add('invalid');
+    badge.title = 'API Token Missing or Invalid';
+    return;
+  }
+
+  // Check for expiry
+  const expiryDate = new Date(tokenData.expires_at);
+  const now = new Date();
+  const diffTime = expiryDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) {
+    badge.classList.add('invalid');
+    badge.title = 'API Token Expired';
+  } else if (diffDays <= 7) {
+    badge.classList.add('warning');
+    badge.title = `API Token Expiring Soon (${diffDays} days left)`;
+  } else {
+    badge.classList.add('valid');
+    badge.title = 'API Token Valid';
+  }
+}
+
 // Initialize when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   initModeToggles();
+  updateApiStatusBadge();
 
   // Render the default component
   renderComponent('settings');
 
   console.log('Settings page initialized');
+});
+
+// Listen for storage changes to update the badge
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && (changes[tokenService.TOKEN_DATA_KEY] || changes[tokenService.API_TOKEN_KEY])) {
+    updateApiStatusBadge();
+  }
 });
 
 // Export the renderComponent function so it can be called from the HTML

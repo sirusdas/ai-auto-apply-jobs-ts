@@ -21,13 +21,24 @@ export interface PersonalInfo {
   Email: string;
 }
 
+export interface ErrorInfo {
+  message: string;
+  timestamp: string;
+}
+
 export interface TokenData {
   valid: boolean;
-  data?: {
-    planType: string;
-    expires_at: string;
-    usage_count: number;
-  };
+  planType: string;
+  expires_at: string;
+  usage_count: number;
+  last_validated: string;
+  last_error: ErrorInfo | null;
+  error?: string; // For backward compatibility or immediate errors
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  data?: any;
   error?: string;
 }
 

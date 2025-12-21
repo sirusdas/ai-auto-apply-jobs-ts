@@ -17,6 +17,7 @@ import { ClaudeProvider } from '../utils/providers/claudeProvider';
 import { OpenAIProvider } from '../utils/providers/openaiProvider';
 import { migrateToMultiAI } from '../utils/migration';
 import { AISettings } from '../types';
+import * as tokenService from '../utils/tokenService';
 
 const aiService = new AIService();
 
@@ -34,7 +35,56 @@ async function initAIService() {
   }
 }
 
+// Initialize validation schedule and periodic checks
+async function initTokenManagement() {
+  await tokenService.initializeValidationSchedule();
+
+  // Check expiry on startup
+  checkTokenExpiry();
+
+  // Set up periodic check for validation (every minute)
+  setInterval(async () => {
+    const shouldValidate = await tokenService.shouldValidate();
+    if (shouldValidate) {
+      const token = await tokenService.getToken();
+      if (token) {
+        console.log('Background: Performing periodic token validation');
+        await tokenService.validateToken();
+      }
+    }
+  }, 60000);
+}
+
+async function checkTokenExpiry() {
+  const tokenData = await tokenService.getTokenData();
+  if (!tokenData || !tokenData.valid || !tokenData.expires_at) return;
+
+  const expiryDate = new Date(tokenData.expires_at);
+  const now = new Date();
+  const diffTime = expiryDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) {
+    chrome.notifications.create('token-expired', {
+      type: 'basic',
+      iconUrl: '128128.png',
+      title: 'API Token Expired',
+      message: 'Your API token has expired. Please renew it to continue using AI features.',
+      priority: 2
+    });
+  } else if (diffDays <= 7) {
+    chrome.notifications.create('token-expiring', {
+      type: 'basic',
+      iconUrl: '128128.png',
+      title: 'API Token Expiring Soon',
+      message: `Your API token will expire in ${diffDays} days. Please renew it soon.`,
+      priority: 1
+    });
+  }
+}
+
 initAIService();
+initTokenManagement();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -44,8 +94,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     fetchToken(token)
       .then((response) => {
         // Extract token type from the response
-        const planType = response?.data?.planType || 'Free'; // Default to 'Free' if not found
-        // Store the token type in chrome.storage.local
+        const planType = response?.data?.planType || response?.planType || 'Free';
+        // Store the token type in chrome.storage.local for compatibility
         chrome.storage.local.set({ planType: planType }, () => {
           console.log('Token type stored:', planType);
           sendResponse(response);
@@ -56,6 +106,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ valid: false, error: error.message });
       });
     return true; // Keep the message channel open for async response
+  }
+
+  if (request.action === 'clearToken') {
+    chrome.storage.local.remove([
+      tokenService.API_TOKEN_KEY,
+      tokenService.TOKEN_DATA_KEY,
+      tokenService.TOKEN_VALIDATION_TIMESTAMP_KEY,
+      'planType'
+    ], () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
 
   if (request.action === 'openDefaultInputPage') {

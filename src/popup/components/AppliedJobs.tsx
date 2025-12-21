@@ -46,7 +46,14 @@ const AppliedJobs: React.FC = () => {
   const [timeRange, setTimeRange] = useState<string>('month');
   const [selectedJob, setSelectedJob] = useState<AppliedJob | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [planType, setPlanType] = useState<string>('Free');
   const chartRef = useRef<any>(null);
+
+  useEffect(() => {
+    chrome.storage.local.get(['planType'], (result) => {
+      if (result.planType) setPlanType(result.planType);
+    });
+  }, []);
 
   // Generate random colors for charts
   const generateColors = (count: number) => {
@@ -311,34 +318,40 @@ const AppliedJobs: React.FC = () => {
 
       <div className="stats">
         <h3>Total Jobs Applied: {getTotalJobsCount()}</h3>
+        <div className="plan-badge">
+          Current Plan: <span className={`badge plan-${planType.toLowerCase()}`}>{planType}</span>
+        </div>
       </div>
 
       <div className="chart-controls">
-        <div className="form-group">
-          <label htmlFor="chart-type">Chart Type:</label>
-          <select
-            id="chart-type"
-            value={chartType}
-            onChange={(e) => setChartType(e.target.value)}
-          >
-            <option value="line">Line Chart</option>
-            <option value="bar">Bar Chart</option>
-            <option value="pie">Pie Chart</option>
-          </select>
-        </div>
+        <h3>Application Analytics {planType === 'Free' && <span className="pro-label">(Pro Feature)</span>}</h3>
+        <div className="controls-grid">
+          <div className="form-group">
+            <label htmlFor="chart-type">Chart Type:</label>
+            <select
+              id="chart-type"
+              value={chartType}
+              onChange={(e) => setChartType(e.target.value)}
+            >
+              <option value="line">Line Chart</option>
+              <option value="bar">Bar Chart</option>
+              <option value="pie">Pie Chart</option>
+            </select>
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="time-range">Time Range:</label>
-          <select
-            id="time-range"
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-          >
-            <option value="day">Today</option>
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-            <option value="all">All Time</option>
-          </select>
+          <div className="form-group">
+            <label htmlFor="time-range">Time Range:</label>
+            <select
+              id="time-range"
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+            >
+              <option value="day">Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -475,8 +488,8 @@ const AppliedJobs: React.FC = () => {
                         </thead>
                         <tbody>
                           {selectedJob.applicationFormData.inputs.map((input: any, index: number) => {
-                            // Try to extract a meaningful label from the input name or nearby elements
-                            let label = input.name || 'N/A';
+                            // Try to extract a meaningful label from the input label or name
+                            let label = input.label || input.name || 'N/A';
 
                             // If the name is a URN, try to find a better label
                             if (label.startsWith('urn:li:')) {
@@ -627,7 +640,7 @@ const AppliedJobs: React.FC = () => {
                         <tbody>
                           {selectedJob.applicationFormData.dropdowns.map((dropdown: any, index: number) => {
                             // Try to create a more user-friendly field name
-                            let fieldName = dropdown.name || 'Dropdown Selection';
+                            let fieldName = dropdown.label || dropdown.name || 'Dropdown Selection';
 
                             // Improve URN-based labels
                             if (fieldName.startsWith('urn:li:')) {
@@ -705,6 +718,28 @@ const AppliedJobs: React.FC = () => {
                       </table>
                     </div>
                   )}
+
+                  {selectedJob.applicationFormData.checkboxes && selectedJob.applicationFormData.checkboxes.length > 0 && (
+                    <div className="form-section">
+                      <h5>Checkboxes</h5>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Question/Label</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedJob.applicationFormData.checkboxes.map((checkbox: any, index: number) => (
+                            <tr key={index}>
+                              <td>{checkbox.name || 'Checkbox'}</td>
+                              <td>{checkbox.checked ? 'Checked' : 'Unchecked'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p>No form data available for this application.</p>
@@ -730,6 +765,43 @@ const AppliedJobs: React.FC = () => {
           <li>Analyze your job search patterns by location.</li>
         </ul>
       </div>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .plan-badge {
+          margin-top: 10px;
+          font-size: 0.9em;
+          color: #666;
+        }
+        .badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 0.85em;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+        .plan-pro { background: #ebf8ff; color: #2b6cb0; }
+        .plan-enterprise { background: #faf5ff; color: #6b46c1; }
+        .plan-free { background: #f7fafc; color: #4a5568; }
+        
+        .pro-label {
+          font-size: 0.5em;
+          color: #2b6cb0;
+          vertical-align: middle;
+          margin-left: 8px;
+          background: #ebf8ff;
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+        
+        .controls-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 15px;
+          margin-top: 10px;
+        }
+      `}} />
     </div>
   );
 };

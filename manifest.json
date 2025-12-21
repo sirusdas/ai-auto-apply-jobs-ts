@@ -8,7 +8,12 @@
     "48": "4848.png",
     "128": "128128.png"
   },
-  "permissions": ["storage", "activeTab", "tabs"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs",
+    "notifications"
+  ],
   "host_permissions": [
     "https://qerds.com/*",
     "https://*.linkedin.com/*"
@@ -26,8 +31,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.linkedin.com/*"],
-      "js": ["content.js"]
+      "matches": [
+        "https://*.linkedin.com/*"
+      ],
+      "js": [
+        "content.js"
+      ]
     }
   ],
   "options_ui": {
@@ -35,8 +44,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/compressed_resume.yaml"],
-      "matches": ["https://*.linkedin.com/*"]
+      "resources": [
+        "assets/compressed_resume.yaml"
+      ],
+      "matches": [
+        "https://*.linkedin.com/*"
+      ]
     }
   ]
 }
