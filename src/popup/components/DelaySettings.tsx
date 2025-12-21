@@ -35,8 +35,17 @@ const DelaySettings: React.FC = () => {
 
   return (
     <div className="delay-settings">
-      <h2>Delay Settings</h2>
-      
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Delay Settings
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('delays')}
+          title="Learn about wait & delay settings"
+        >
+          ℹ️
+        </button>
+      </h2>
+
       <div className="form-group">
         <label htmlFor="very-short-delay">Very Short Delay (ms):</label>
         <input
@@ -49,7 +58,7 @@ const DelaySettings: React.FC = () => {
           Used for minor actions like clicks.
         </small>
       </div>
-      
+
       <div className="form-group">
         <label htmlFor="short-delay">Short Delay (ms):</label>
         <input
@@ -62,7 +71,7 @@ const DelaySettings: React.FC = () => {
           Used between more significant steps.
         </small>
       </div>
-      
+
       <div className="form-group">
         <label htmlFor="long-delay">Long Delay (ms):</label>
         <input
@@ -75,28 +84,28 @@ const DelaySettings: React.FC = () => {
           Used for page loads or waiting for elements to appear.
         </small>
       </div>
-      
-      <button 
-        className="btn btn-primary" 
+
+      <button
+        className="btn btn-primary"
         onClick={handleSaveDelays}
       >
         Save Delays
       </button>
-      
+
       {status && (
         <div className="status-message success">
           {status}
         </div>
       )}
-      
+
       <div className="info-section">
         <h3>About Delay Settings</h3>
         <p>
-          These settings control the time delays between various actions performed by the extension. 
+          These settings control the time delays between various actions performed by the extension.
           Adjusting these can help mimic human behavior and avoid potential issues with LinkedIn's detection mechanisms.
         </p>
         <p>
-          <strong>Recommendation:</strong> It's generally recommended to keep these at their default values 
+          <strong>Recommendation:</strong> It's generally recommended to keep these at their default values
           unless you are an advanced user.
         </p>
       </div>

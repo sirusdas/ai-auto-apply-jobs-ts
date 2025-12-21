@@ -24,8 +24,17 @@ const JobMatchSettings: React.FC = () => {
 
   return (
     <div className="job-match-settings">
-      <h2>Job Match Settings</h2>
-      
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Job Match Settings
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('job-match')}
+          title="Learn about job matching"
+        >
+          ℹ️
+        </button>
+      </h2>
+
       <Accordion title="Match Configuration" defaultOpen={true}>
         <div className="form-group">
           <label htmlFor="min-match-score">Minimum Match Score (1-5):</label>
@@ -41,26 +50,26 @@ const JobMatchSettings: React.FC = () => {
             Set a minimum score for job matching. The extension will only apply to jobs that meet or exceed this score.
           </small>
         </div>
-        
-        <button 
-          className="btn btn-primary" 
+
+        <button
+          className="btn btn-primary"
           onClick={handleSaveSettings}
         >
           Save Match Settings
         </button>
-        
+
         {status && (
           <div className="status-message success">
             {status}
           </div>
         )}
       </Accordion>
-      
+
       <Accordion title="Information">
         <div className="info-section">
           <h3>About Job Match Settings</h3>
           <p>
-            By setting a minimum score, you can instruct the extension to only apply for jobs that are a good fit for your profile, 
+            By setting a minimum score, you can instruct the extension to only apply for jobs that are a good fit for your profile,
             saving you time and focusing on relevant opportunities.
           </p>
           <p>

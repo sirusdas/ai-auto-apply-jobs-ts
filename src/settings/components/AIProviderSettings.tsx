@@ -3,162 +3,171 @@ import { AISettings, AIProvider } from '../../types';
 import ModelSelector from './ModelSelector';
 
 const AIProviderSettings: React.FC = () => {
-    const [settings, setSettings] = useState<AISettings>({
-        providers: [
-            { id: 'gemini', name: 'Google Gemini', enabled: false, apiKey: '', model: 'gemma-3-27b-it', priority: 1 },
-            { id: 'claude', name: 'Anthropic Claude', enabled: false, apiKey: '', model: 'claude-3-5-sonnet-20241022', priority: 2 },
-            { id: 'openai', name: 'OpenAI ChatGPT', enabled: false, apiKey: '', model: 'gpt-4o', priority: 3 }
-        ],
-        primaryProvider: 'gemini',
-        enableFallback: false,
-        timeout: 30000
+  const [settings, setSettings] = useState<AISettings>({
+    providers: [
+      { id: 'gemini', name: 'Google Gemini', enabled: false, apiKey: '', model: 'gemma-3-27b-it', priority: 1 },
+      { id: 'claude', name: 'Anthropic Claude', enabled: false, apiKey: '', model: 'claude-3-5-sonnet-20241022', priority: 2 },
+      { id: 'openai', name: 'OpenAI ChatGPT', enabled: false, apiKey: '', model: 'gpt-4o', priority: 3 }
+    ],
+    primaryProvider: 'gemini',
+    enableFallback: false,
+    timeout: 30000
+  });
+
+  const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+
+  useEffect(() => {
+    chrome.storage.local.get(['aiSettings'], (result) => {
+      if (result.aiSettings) {
+        setSettings(result.aiSettings);
+      }
     });
+  }, []);
 
-    const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const handleProviderChange = (id: string, field: keyof AIProvider, value: any) => {
+    const updatedProviders = settings.providers.map(p =>
+      p.id === id ? { ...p, [field]: value } : p
+    );
+    setSettings({ ...settings, providers: updatedProviders });
+  };
 
-    useEffect(() => {
-        chrome.storage.local.get(['aiSettings'], (result) => {
-            if (result.aiSettings) {
-                setSettings(result.aiSettings);
-            }
-        });
-    }, []);
+  const handleSave = () => {
+    chrome.storage.local.set({ aiSettings: settings }, () => {
+      setStatus({ type: 'success', message: 'AI settings saved successfully!' });
+      setTimeout(() => setStatus(null), 3000);
+    });
+  };
 
-    const handleProviderChange = (id: string, field: keyof AIProvider, value: any) => {
-        const updatedProviders = settings.providers.map(p =>
-            p.id === id ? { ...p, [field]: value } : p
-        );
-        setSettings({ ...settings, providers: updatedProviders });
-    };
+  return (
+    <div className="ai-provider-settings">
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        AI Provider Settings
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('ai-provider-selection')}
+          title="Learn about AI providers"
+        >
+          ℹ️
+        </button>
+      </h2>
 
-    const handleSave = () => {
-        chrome.storage.local.set({ aiSettings: settings }, () => {
-            setStatus({ type: 'success', message: 'AI settings saved successfully!' });
-            setTimeout(() => setStatus(null), 3000);
-        });
-    };
+      <div className="global-settings card">
+        <h3>Global Settings</h3>
+        <div className="form-group">
+          <label htmlFor="primary-provider">Primary AI Provider:</label>
+          <select
+            id="primary-provider"
+            value={settings.primaryProvider}
+            onChange={(e) => setSettings({ ...settings, primaryProvider: e.target.value })}
+          >
+            {settings.providers.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
 
-    return (
-        <div className="ai-provider-settings">
-            <h2>AI Provider Settings</h2>
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.enableFallback}
+              onChange={(e) => setSettings({ ...settings, enableFallback: e.target.checked })}
+            />
+            Enable Automatic Fallback (Try other enabled providers if primary fails)
+          </label>
+        </div>
+      </div>
 
-            <div className="global-settings card">
-                <h3>Global Settings</h3>
+      <div className="providers-list">
+        {settings.providers.map(provider => (
+          <div key={provider.id} className={`provider-card card ${provider.enabled ? 'enabled' : 'disabled'}`}>
+            <div className="provider-header">
+              <h3>{provider.name}</h3>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={provider.enabled}
+                  onChange={(e) => handleProviderChange(provider.id, 'enabled', e.target.checked)}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+
+            {provider.enabled && (
+              <div className="provider-details">
                 <div className="form-group">
-                    <label htmlFor="primary-provider">Primary AI Provider:</label>
-                    <select
-                        id="primary-provider"
-                        value={settings.primaryProvider}
-                        onChange={(e) => setSettings({ ...settings, primaryProvider: e.target.value })}
-                    >
-                        {settings.providers.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
+                  <label htmlFor={`${provider.id}-api-key`}>API Key:</label>
+                  <input
+                    type="password"
+                    id={`${provider.id}-api-key`}
+                    value={provider.apiKey}
+                    onChange={(e) => handleProviderChange(provider.id, 'apiKey', e.target.value)}
+                    placeholder={`Enter ${provider.name} API Key`}
+                  />
                 </div>
-
-                <div className="form-group checkbox-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={settings.enableFallback}
-                            onChange={(e) => setSettings({ ...settings, enableFallback: e.target.checked })}
-                        />
-                        Enable Automatic Fallback (Try other enabled providers if primary fails)
-                    </label>
+                <div className="form-group">
+                  <label htmlFor={`${provider.id}-model`}>Model:</label>
+                  <ModelSelector
+                    providerId={provider.id}
+                    selectedModel={provider.model || ''}
+                    onModelChange={(model) => handleProviderChange(provider.id, 'model', model)}
+                    disabled={!provider.enabled}
+                  />
                 </div>
-            </div>
-
-            <div className="providers-list">
-                {settings.providers.map(provider => (
-                    <div key={provider.id} className={`provider-card card ${provider.enabled ? 'enabled' : 'disabled'}`}>
-                        <div className="provider-header">
-                            <h3>{provider.name}</h3>
-                            <label className="switch">
-                                <input
-                                    type="checkbox"
-                                    checked={provider.enabled}
-                                    onChange={(e) => handleProviderChange(provider.id, 'enabled', e.target.checked)}
-                                />
-                                <span className="slider round"></span>
-                            </label>
-                        </div>
-
-                        {provider.enabled && (
-                            <div className="provider-details">
-                                <div className="form-group">
-                                    <label htmlFor={`${provider.id}-api-key`}>API Key:</label>
-                                    <input
-                                        type="password"
-                                        id={`${provider.id}-api-key`}
-                                        value={provider.apiKey}
-                                        onChange={(e) => handleProviderChange(provider.id, 'apiKey', e.target.value)}
-                                        placeholder={`Enter ${provider.name} API Key`}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor={`${provider.id}-model`}>Model:</label>
-                                    <ModelSelector
-                                        providerId={provider.id}
-                                        selectedModel={provider.model || ''}
-                                        onModelChange={(model) => handleProviderChange(provider.id, 'model', model)}
-                                        disabled={!provider.enabled}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor={`${provider.id}-priority`}>Priority (Lower is higher):</label>
-                                    <input
-                                        type="number"
-                                        id={`${provider.id}-priority`}
-                                        value={provider.priority}
-                                        onChange={(e) => handleProviderChange(provider.id, 'priority', parseInt(e.target.value))}
-                                        min="1"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            <div className="notice-card card warning-notice">
-                <div className="notice-header">
-                    <span className="notice-icon">⚠️</span>
-                    <h3>Important Notice About Paid Models</h3>
+                <div className="form-group">
+                  <label htmlFor={`${provider.id}-priority`}>Priority (Lower is higher):</label>
+                  <input
+                    type="number"
+                    id={`${provider.id}-priority`}
+                    value={provider.priority}
+                    onChange={(e) => handleProviderChange(provider.id, 'priority', parseInt(e.target.value))}
+                    min="1"
+                  />
                 </div>
-                <div className="notice-content">
-                    <p>Many AI models listed here require paid subscriptions or API credits:</p>
-                    <ul>
-                        <li><strong>Free models</strong> (like Gemini Flash/Pro) are clearly marked and can be used immediately with a free API key.</li>
-                        <li><strong>Paid models</strong> (Claude, GPT-4o, etc.) require you to purchase API access directly from the provider.</li>
-                        <li>This extension <strong>does not</strong> provide or pay for AI API access.</li>
-                        <li>Please ensure you have active API credits before selecting a paid model.</li>
-                    </ul>
-                    <div className="pricing-links">
-                        <p><strong>Official Pricing Pages:</strong></p>
-                        <div className="links-grid">
-                            <a href="https://ai.google.dev/pricing" target="_blank" rel="noreferrer">Google Gemini</a>
-                            <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer">Anthropic Claude</a>
-                            <a href="https://openai.com/api/pricing" target="_blank" rel="noreferrer">OpenAI GPT</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="actions">
-                <button className="btn btn-primary" onClick={handleSave}>
-                    Save All AI Settings
-                </button>
-            </div>
-
-            {status && (
-                <div className={`status-message ${status.type}`}>
-                    {status.message}
-                </div>
+              </div>
             )}
+          </div>
+        ))}
+      </div>
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
+      <div className="notice-card card warning-notice">
+        <div className="notice-header">
+          <span className="notice-icon">⚠️</span>
+          <h3>Important Notice About Paid Models</h3>
+        </div>
+        <div className="notice-content">
+          <p>Many AI models listed here require paid subscriptions or API credits:</p>
+          <ul>
+            <li><strong>Free models</strong> (like Gemini Flash/Pro) are clearly marked and can be used immediately with a free API key.</li>
+            <li><strong>Paid models</strong> (Claude, GPT-4o, etc.) require you to purchase API access directly from the provider.</li>
+            <li>This extension <strong>does not</strong> provide or pay for AI API access.</li>
+            <li>Please ensure you have active API credits before selecting a paid model.</li>
+          </ul>
+          <div className="pricing-links">
+            <p><strong>Official Pricing Pages:</strong></p>
+            <div className="links-grid">
+              <a href="https://ai.google.dev/pricing" target="_blank" rel="noreferrer">Google Gemini</a>
+              <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer">Anthropic Claude</a>
+              <a href="https://openai.com/api/pricing" target="_blank" rel="noreferrer">OpenAI GPT</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="actions">
+        <button className="btn btn-primary" onClick={handleSave}>
+          Save All AI Settings
+        </button>
+      </div>
+
+      {status && (
+        <div className={`status-message ${status.type}`}>
+          {status.message}
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .card {
           background: var(--card-bg, #fff);
           border-radius: 8px;
@@ -279,8 +288,8 @@ const AIProviderSettings: React.FC = () => {
           color: #166534;
         }
       `}} />
-        </div>
-    );
+    </div>
+  );
 };
 
 export default AIProviderSettings;

@@ -314,7 +314,16 @@ const AppliedJobs: React.FC = () => {
 
   return (
     <div className="applied-jobs">
-      <h2>Applied Jobs</h2>
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Applied Jobs
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('applied-jobs')}
+          title="Learn about application tracking"
+        >
+          ℹ️
+        </button>
+      </h2>
 
       <div className="stats">
         <h3>Total Jobs Applied: {getTotalJobsCount()}</h3>

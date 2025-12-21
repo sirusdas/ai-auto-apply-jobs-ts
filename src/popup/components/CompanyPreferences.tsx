@@ -12,7 +12,7 @@ const CompanyPreferences: React.FC = () => {
       if (result.ignoreCompanies) {
         setIgnoreCompanies(result.ignoreCompanies);
       }
-      
+
       if (result.applyToProductCompanies !== undefined) {
         setApplyToProductCompanies(result.applyToProductCompanies);
       } else {
@@ -20,7 +20,7 @@ const CompanyPreferences: React.FC = () => {
         setApplyToProductCompanies(true);
         chrome.storage.local.set({ applyToProductCompanies: true });
       }
-      
+
       if (result.applyToServiceCompanies !== undefined) {
         setApplyToServiceCompanies(result.applyToServiceCompanies);
       } else {
@@ -40,7 +40,7 @@ const CompanyPreferences: React.FC = () => {
   };
 
   const handleSaveCompanyPreferences = () => {
-    chrome.storage.local.set({ 
+    chrome.storage.local.set({
       applyToProductCompanies: applyToProductCompanies,
       applyToServiceCompanies: applyToServiceCompanies
     }, () => {
@@ -53,7 +53,7 @@ const CompanyPreferences: React.FC = () => {
   return (
     <div className="company-preferences">
       <h2>Company Preferences</h2>
-      
+
       <div className="form-group">
         <label htmlFor="ignore-companies">Companies to Ignore:</label>
         <textarea
@@ -67,18 +67,27 @@ const CompanyPreferences: React.FC = () => {
           List any companies you want to avoid, separated by commas. The extension will skip applications to these companies.
         </small>
       </div>
-      
-      <button 
-        className="btn btn-primary" 
+
+      <button
+        className="btn btn-primary"
         onClick={handleSaveIgnoreCompanies}
       >
         Save Companies to Ignore
       </button>
-      
+
       <div className="form-group" style={{ marginTop: '20px' }}>
-        <h3>Company Type Preferences</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          Company Type Preferences
+          <button
+            className="info-button"
+            onClick={() => (window as any).showInfoModal('company-filter')}
+            title="Learn about company filtering"
+          >
+            ℹ️
+          </button>
+        </h3>
         <p>Select which types of companies you want to apply to:</p>
-        
+
         <div className="checkbox-group">
           <label>
             <input
@@ -92,7 +101,7 @@ const CompanyPreferences: React.FC = () => {
             Companies that create and sell their own products (e.g., Google, Microsoft).
           </small>
         </div>
-        
+
         <div className="checkbox-group">
           <label>
             <input
@@ -107,14 +116,14 @@ const CompanyPreferences: React.FC = () => {
           </small>
         </div>
       </div>
-      
-      <button 
-        className="btn btn-primary" 
+
+      <button
+        className="btn btn-primary"
         onClick={handleSaveCompanyPreferences}
       >
         Save Company Preferences
       </button>
-      
+
       {status && (
         <div className="status-message success">
           {status}

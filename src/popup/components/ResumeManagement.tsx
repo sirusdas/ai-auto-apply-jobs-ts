@@ -175,8 +175,17 @@ ${resumeText}`;
   };
 
   return (
-    <div className="resume-management">
-      <h2>Resume Management</h2>
+    <div className="resume-management" data-demo="resume-section">
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Resume Management
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('resume-management')}
+          title="Learn about resume management"
+        >
+          ℹ️
+        </button>
+      </h2>
 
       <div className="form-group">
         <label htmlFor="resume-text">Full Resume Text:</label>

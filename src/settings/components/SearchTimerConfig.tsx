@@ -15,11 +15,11 @@ const SearchTimerConfig: React.FC = () => {
       id: string;
       jobTypeName: string;
       jobTypeTimer: string;
-      }>;
+    }>;
   }>>([]);
-  
+
   const [runInLoop, setRunInLoop] = useState<boolean>(false);
-  
+
   const jsonEditorRef = useRef<HTMLDivElement>(null);
   const jsonEditorInstance = useRef<any>(null);
   const [isJsonEditing, setIsJsonEditing] = useState(false);
@@ -48,7 +48,7 @@ const SearchTimerConfig: React.FC = () => {
           }]
         }]);
       }
-      
+
       if (result.runInLoop !== undefined) {
         setRunInLoop(result.runInLoop);
       }
@@ -63,7 +63,7 @@ const SearchTimerConfig: React.FC = () => {
         if (jsonEditorInstance.current) {
           jsonEditorInstance.current.destroy();
         }
-        
+
         // Create a simple textarea-based JSON editor
         jsonEditorRef.current.innerHTML = '';
         const textarea = document.createElement('textarea');
@@ -78,11 +78,11 @@ const SearchTimerConfig: React.FC = () => {
         textarea.style.backgroundColor = '#f8f9fa';
         textarea.readOnly = !isJsonEditing; // Make editable when in editing mode
         jsonEditorRef.current.appendChild(textarea);
-        
+
         // Add button container
         const buttonContainer = document.createElement('div');
         buttonContainer.style.marginTop = '10px';
-        
+
         if (!isJsonEditing) {
           const editButton = document.createElement('button');
           editButton.textContent = 'Edit JSON';
@@ -98,7 +98,7 @@ const SearchTimerConfig: React.FC = () => {
           saveButton.style.marginRight = '10px';
           saveButton.onclick = handleJsonSave;
           buttonContainer.appendChild(saveButton);
-          
+
           const cancelButton = document.createElement('button');
           cancelButton.textContent = 'Cancel';
           cancelButton.className = 'btn btn-danger';
@@ -106,13 +106,13 @@ const SearchTimerConfig: React.FC = () => {
           cancelButton.onclick = () => setIsJsonEditing(false);
           buttonContainer.appendChild(cancelButton);
         }
-        
+
         jsonEditorRef.current.appendChild(buttonContainer);
       } catch (e) {
         console.error('Error initializing JSON editor:', e);
       }
     }
-    
+
     // Initialize accordions after the component is rendered
     setTimeout(() => {
       if (typeof (window as any).initSearchTimerAccordions === 'function') {
@@ -136,7 +136,7 @@ const SearchTimerConfig: React.FC = () => {
           const newJobConfigs = JSON.parse(textarea.value);
           setJobConfigs(newJobConfigs);
           setIsJsonEditing(false);
-          
+
           // Show success message
           const toast = document.getElementById('toast-message');
           if (toast) {
@@ -175,7 +175,7 @@ const SearchTimerConfig: React.FC = () => {
           toast.style.display = 'none';
         }, 3000);
       }
-      
+
       // Update JSON editor
       if (jsonEditorRef.current) {
         const textarea = jsonEditorRef.current.querySelector('textarea');
@@ -266,8 +266,17 @@ const SearchTimerConfig: React.FC = () => {
 
   return (
     <div className="search-timer-config">
-      <h2>Search and Timer Configuration</h2>
-      
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Search and Timer Configuration
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('search-timer')}
+          title="Learn about search automation"
+        >
+          ℹ️
+        </button>
+      </h2>
+
       {/* Run in Loop Toggle */}
       <div className="form-group">
         <label>
@@ -279,11 +288,11 @@ const SearchTimerConfig: React.FC = () => {
           Run in Loop
         </label>
         <small>
-          Enable this option to continuously repeat the job search process. 
+          Enable this option to continuously repeat the job search process.
           When disabled, the search will run only once through all configurations.
         </small>
       </div>
-      
+
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
         <div className="jobs-container">
           {jobConfigs.map((jobConfig, jobIndex) => (
@@ -298,7 +307,7 @@ const SearchTimerConfig: React.FC = () => {
                     onChange={(e) => updateJobConfig(jobIndex, 'jobTitleName', e.target.value)}
                   />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Timer:</label>
                   <input
@@ -308,7 +317,7 @@ const SearchTimerConfig: React.FC = () => {
                     onChange={(e) => updateJobConfig(jobIndex, 'jobConfigTimer', e.target.value)}
                   />
                 </div>
-                
+
                 <div className="accordion">
                   <h3>Locations</h3>
                   <div className="panel">
@@ -325,7 +334,7 @@ const SearchTimerConfig: React.FC = () => {
                                 onChange={(e) => updateLocation(jobIndex, locationIndex, 'locationName', e.target.value)}
                               />
                             </div>
-                            
+
                             <div className="form-group">
                               <label>Location Timer:</label>
                               <input
@@ -336,7 +345,7 @@ const SearchTimerConfig: React.FC = () => {
                               />
                             </div>
                           </div>
-                          
+
                           <button
                             type="button"
                             className="btn btn-danger"
@@ -356,7 +365,7 @@ const SearchTimerConfig: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="accordion">
                   <h3>Job Types</h3>
                   <div className="panel">
@@ -373,7 +382,7 @@ const SearchTimerConfig: React.FC = () => {
                                 onChange={(e) => updateJobType(jobIndex, typeIndex, 'jobTypeName', e.target.value)}
                               />
                             </div>
-                            
+
                             <div className="form-group">
                               <label>Job Type Timer:</label>
                               <input
@@ -384,7 +393,7 @@ const SearchTimerConfig: React.FC = () => {
                               />
                             </div>
                           </div>
-                          
+
                           <button
                             type="button"
                             className="btn btn-danger"
@@ -404,7 +413,7 @@ const SearchTimerConfig: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="form-group">
                   <label>Sequence:</label>
                   <input
@@ -414,7 +423,7 @@ const SearchTimerConfig: React.FC = () => {
                     onChange={(e) => updateJobConfig(jobIndex, 'sequence', e.target.value)}
                   />
                 </div>
-                
+
                 <button
                   type="button"
                   className="btn btn-danger"
@@ -433,19 +442,19 @@ const SearchTimerConfig: React.FC = () => {
             Add Job Config
           </button>
         </div>
-        
+
         <div className="accordion developer-only">
           <h3>Jobs in JSON Format (Auto Generated)</h3>
           <div className="panel">
             <div ref={jsonEditorRef} id="jobsJsonEditor"></div>
           </div>
         </div>
-        
+
         <button type="submit" className="btn btn-primary">
           Save Job Configs
         </button>
       </form>
-      
+
       <div id="toast-message" style={{
         display: 'none',
         position: 'fixed',

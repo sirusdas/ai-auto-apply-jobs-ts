@@ -285,22 +285,23 @@
 <body>
   <div class="app">
     <div class="sidebar">
-      <div class="header">
+      <div class="header" style="display: flex; align-items: center; justify-content: space-between;">
         <h1>Auto Apply Settings</h1>
+        <div id="settings-help-button-root"></div>
       </div>
 
       <ul class="nav-tabs">
-        <li><button data-tab="settings" class="active">API Settings <span id="api-status-badge"
-              class="status-badge"></span></button></li>
-        <li><button data-tab="gemini">AI Providers</button></li>
-        <li><button data-tab="personal-info">Personal Info</button></li>
-        <li><button data-tab="resume">Resume Management</button></li>
-        <li><button data-tab="job-match">Job Match Settings</button></li>
-        <li><button data-tab="company-preferences">Company Preferences</button></li>
-        <li><button data-tab="delay">Delay Settings</button></li>
-        <li><button data-tab="applied-jobs">Applied Jobs</button></li>
+        <li><button data-tab="settings" data-demo="api-settings-tab" class="active">API Settings <span
+              id="api-status-badge" class="status-badge"></span></button></li>
+        <li><button data-tab="gemini" data-demo="ai-providers-tab">AI Providers</button></li>
+        <li><button data-tab="personal-info" data-demo="personal-info-tab">Personal Info</button></li>
+        <li><button data-tab="resume" data-demo="resume-tab">Resume Management</button></li>
+        <li><button data-tab="job-match" data-demo="job-match-tab">Job Match Settings</button></li>
+        <li><button data-tab="company-preferences" data-demo="company-preferences-tab">Company Preferences</button></li>
+        <li><button data-tab="delay" data-demo="delay-tab">Delay Settings</button></li>
+        <li><button data-tab="applied-jobs" data-demo="applied-jobs-tab">Applied Jobs</button></li>
         <!-- <li><button data-tab="form-control">Form Control</button></li> -->
-        <li><button data-tab="search-timer">Search Timer</button></li>
+        <li><button data-tab="search-timer" data-demo="search-timer-tab">Search Timer</button></li>
       </ul>
 
       <!-- <div class="toggles-container">

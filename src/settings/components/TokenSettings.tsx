@@ -39,7 +39,7 @@ const TokenSettings: React.FC = () => {
         try {
             // Get current token data to check if we have a valid token
             const currentTokenData = await tokenService.getTokenData();
-            const isCurrentTokenValid = currentTokenData?.valid && 
+            const isCurrentTokenValid = currentTokenData?.valid &&
                 new Date(currentTokenData.expires_at).getTime() > Date.now();
 
             // Validate the new token
@@ -50,12 +50,12 @@ const TokenSettings: React.FC = () => {
 
             // If we have a valid current token and the new token is invalid, don't replace it
             if (isCurrentTokenValid && !result.valid) {
-                setStatusMessage({ 
-                    type: 'error', 
-                    text: 'Current token is still valid. New token is invalid and was not saved.' 
+                setStatusMessage({
+                    type: 'error',
+                    text: 'Current token is still valid. New token is invalid and was not saved.'
                 });
                 setValidating(false);
-                
+
                 // Refresh the UI to show the current valid token status
                 const refreshedTokenData = await tokenService.getTokenData();
                 setTokenData(refreshedTokenData);
@@ -64,9 +64,9 @@ const TokenSettings: React.FC = () => {
 
             // If we're trying to save a token for the first time, it must be fresh (usage_count = 1)
             if ((!currentTokenData || !currentTokenData.valid) && result.valid && !isNewTokenFresh) {
-                setStatusMessage({ 
-                    type: 'error', 
-                    text: 'Token is valid but has been used before. Please use a fresh token.' 
+                setStatusMessage({
+                    type: 'error',
+                    text: 'Token is valid but has been used before. Please use a fresh token.'
                 });
                 setValidating(false);
                 return;
@@ -85,14 +85,14 @@ const TokenSettings: React.FC = () => {
                 }, 3000);
             } else {
                 setStatusMessage({ type: 'error', text: result.error || 'Invalid token or token already used' });
-                
+
                 // Refresh the UI to show the current token status
                 const refreshedTokenData = await tokenService.getTokenData();
                 setTokenData(refreshedTokenData);
             }
         } catch (error: any) {
             setStatusMessage({ type: 'error', text: error.message || 'Error saving token' });
-            
+
             // Refresh the UI to show the current token status
             const refreshedTokenData = await tokenService.getTokenData();
             setTokenData(refreshedTokenData);
@@ -126,8 +126,8 @@ const TokenSettings: React.FC = () => {
                 chrome.storage.local.set({ [tokenService.TOKEN_DATA_KEY]: result.data });
             } else {
                 // Update state to show token is invalid
-                const updatedTokenData = tokenData ? { 
-                    ...tokenData, 
+                const updatedTokenData = tokenData ? {
+                    ...tokenData,
                     valid: false,
                     last_error: { message: result.error || 'Token is invalid', timestamp: new Date().toISOString() }
                 } : null;
@@ -164,7 +164,7 @@ const TokenSettings: React.FC = () => {
     const expiryInfo = getExpiryInfo();
 
     // Check if token is actually valid (not just present)
-    const isTokenActuallyValid = tokenData?.valid && 
+    const isTokenActuallyValid = tokenData?.valid &&
         new Date(tokenData.expires_at).getTime() > Date.now();
 
     if (loading) {
@@ -173,7 +173,16 @@ const TokenSettings: React.FC = () => {
 
     return (
         <div className="token-settings-enhanced">
-            <h2>API Token Settings</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                API Token Settings
+                <button
+                    className="info-button"
+                    onClick={() => (window as any).showInfoModal('api-tokens')}
+                    title="Learn about API tokens"
+                >
+                    ℹ️
+                </button>
+            </h2>
             <p className="description">
                 Enter your API token to enable job matching, resume analysis, and other AI features.
                 Don't have a token? <a href="https://qerds.com/tools/tgs" target="_blank" rel="noopener noreferrer">Get one here</a>.

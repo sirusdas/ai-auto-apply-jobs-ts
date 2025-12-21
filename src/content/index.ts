@@ -1,6 +1,13 @@
 // Import utility functions
 import { addDelay, addShortDelay, addVeryShortDelay } from '../utils/delay';
 import { handleEasyApplyModal } from './applyHandler';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { demoService } from '../services/demoService';
+import { DemoManager } from '../components/demo/DemoManager';
+import { DemoButton } from '../components/DemoButton';
+import '../components/demo/demo.css';
+import { FIRST_INSTALL_DEMO, SIDEBAR_DEMO } from '../constants/demoSteps';
 
 
 // Constants
@@ -107,12 +114,64 @@ function initExtensionUI(): void {
     if (isLinkedInPage()) {
       initAutoApplyUI();
 
+      // Initialize Demo
+      initializeDemo();
+
       // If we are running and not paused, resume logic
       if (state && state.isRunning) {
         resumeAutoApplyProcess(state);
       }
     }
   });
+}
+
+async function initializeDemo() {
+  const shouldShow = await demoService.shouldShowFirstInstallDemo();
+
+  if (shouldShow) {
+    showDemo(FIRST_INSTALL_DEMO);
+  }
+}
+
+function showDemo(flow: any) {
+  const container = document.createElement('div');
+  container.id = 'ai-job-applier-demo-root';
+  document.body.appendChild(container);
+
+  const root = ReactDOM.createRoot(container);
+  root.render(
+    React.createElement(DemoManager, {
+      flow,
+      onComplete: () => {
+        setTimeout(() => {
+          root.unmount();
+          container.remove();
+        }, 300);
+      }
+    })
+  );
+}
+
+function addDemoButtonToSidebar() {
+  const sidebar = document.body; // or a more specific container if available
+  const demoContainer = document.createElement('div');
+  demoContainer.id = 'ai-job-applier-demo-button-root';
+  demoContainer.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 260px;
+    z-index: 10000;
+    display: none;
+  `;
+
+  document.body.appendChild(demoContainer);
+
+  const root = ReactDOM.createRoot(demoContainer);
+  root.render(
+    React.createElement(DemoButton, {
+      onStartDemo: () => showDemo(SIDEBAR_DEMO)
+    })
+  );
 }
 
 function isLinkedInPage(): boolean {
@@ -141,6 +200,9 @@ function initAutoApplyUI(): void {
   });
 
   document.body.appendChild(mainButton);
+
+  // Add the demo button too
+  addDemoButtonToSidebar();
 }
 
 function styleMainButton(btn: HTMLButtonElement) {
@@ -174,7 +236,7 @@ async function startNewAutoApplyProcess() {
 
   // Check if token is valid before starting
   const isTokenValid = await checkTokenValidity();
-  
+
   if (!isTokenValid) {
     // Show notification about invalid token
     chrome.runtime.sendMessage({
@@ -186,13 +248,13 @@ async function startNewAutoApplyProcess() {
         iconUrl: '128128.png'
       }
     });
-    
+
     // Open settings page
-    chrome.runtime.sendMessage({ 
-      action: 'openPage', 
-      url: chrome.runtime.getURL('settings.html#settings') 
+    chrome.runtime.sendMessage({
+      action: 'openPage',
+      url: chrome.runtime.getURL('settings.html#settings')
     });
-    
+
     return;
   }
 
@@ -1351,7 +1413,7 @@ function showLoadingState() {
 function createControlButtons() {
   if (stopButton) return; // Already created
 
-  stopButton = createButton(90, '#f44336', `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-stop-fill" viewBox="0 0 16 16"><path d="M5 3.5h6A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z"/></svg>`);
+  stopButton = createButton(90, '#f44336', `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-stop-fill" viewBox="0 0 16 16"><path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5z"/></svg>`);
   stopButton.addEventListener('click', stopAutoApplyProcess);
 
   pauseButton = createButton(140, '#FF9800', `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16"><path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z"/></svg>`);
@@ -1360,6 +1422,10 @@ function createControlButtons() {
   timerButton = createButton(190, '#2196F3', `<span id="timer-text" style="font-size: 12px; color:white; font-weight:bold;">--:--</span>`);
   timerButton.style.width = '60px'; // Override width
   timerButton.style.borderRadius = '20px';
+
+  // Show help button
+  const demoButton = document.getElementById('ai-job-applier-demo-button-root');
+  if (demoButton) demoButton.style.display = 'block';
 }
 
 function createButton(rightOffset: number, color: string, html: string): HTMLButtonElement {
@@ -1435,6 +1501,10 @@ function removeControlUI() {
   if (stopButton) { stopButton.remove(); stopButton = null; }
   if (pauseButton) { pauseButton.remove(); pauseButton = null; }
   if (timerButton) { timerButton.remove(); timerButton = null; }
+
+  // Hide help button
+  const demoButton = document.getElementById('ai-job-applier-demo-button-root');
+  if (demoButton) demoButton.style.display = 'none';
 }
 
 function startTimerDisplay(initialRemainingMs: number) {
@@ -1473,8 +1543,8 @@ if (document.readyState === 'loading') {
 // Add this function to check token validity before starting auto-apply
 async function checkTokenValidity(): Promise<boolean> {
   // Log the next scheduled validation time
-  chrome.runtime.sendMessage({ action: 'logNextValidationTime' }, () => {});
-  
+  chrome.runtime.sendMessage({ action: 'logNextValidationTime' }, () => { });
+
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action: 'checkTokenValidity' }, (response) => {
       resolve(response?.valid ?? false);
@@ -1486,7 +1556,7 @@ async function checkTokenValidity(): Promise<boolean> {
 async function startAutoApply() {
   // Check if token is valid before starting
   const isTokenValid = await checkTokenValidity();
-  
+
   if (!isTokenValid) {
     // Show notification about invalid token
     chrome.runtime.sendMessage({
@@ -1498,15 +1568,15 @@ async function startAutoApply() {
         iconUrl: '128128.png'
       }
     });
-    
+
     // Open settings page
-    chrome.runtime.sendMessage({ 
-      action: 'openPage', 
-      url: chrome.runtime.getURL('settings.html#settings') 
+    chrome.runtime.sendMessage({
+      action: 'openPage',
+      url: chrome.runtime.getURL('settings.html#settings')
     });
-    
+
     return;
   }
-  
+
   // Existing auto-apply logic continues here...
 }

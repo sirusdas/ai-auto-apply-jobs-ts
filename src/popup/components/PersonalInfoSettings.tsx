@@ -19,7 +19,7 @@ const PersonalInfoSettings: React.FC = () => {
     City: '',
     Email: ''
   });
-  
+
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
@@ -49,11 +49,20 @@ const PersonalInfoSettings: React.FC = () => {
 
   return (
     <div className="personal-info-settings">
-      <h2>Personal Information</h2>
-      
+      <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Personal Information
+        <button
+          className="info-button"
+          onClick={() => (window as any).showInfoModal('personal-info')}
+          title="Learn about personal information usage"
+        >
+          ℹ️
+        </button>
+      </h2>
+
       <Accordion title="Basic Information" defaultOpen={true}>
         <p>Fill in your basic information. This will be used as a fallback when using Free plan (AI disabled).</p>
-        
+
         <div className="form-group">
           <label htmlFor="FirstName">First Name</label>
           <input
@@ -64,7 +73,7 @@ const PersonalInfoSettings: React.FC = () => {
             onChange={handleChange}
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="LastName">Last Name</label>
           <input
@@ -75,7 +84,7 @@ const PersonalInfoSettings: React.FC = () => {
             onChange={handleChange}
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="Email">Email</label>
           <input
@@ -87,7 +96,7 @@ const PersonalInfoSettings: React.FC = () => {
           />
         </div>
       </Accordion>
-      
+
       <Accordion title="Contact Details">
         <div className="form-group">
           <label htmlFor="PhoneNumber">Phone Number</label>
@@ -99,7 +108,7 @@ const PersonalInfoSettings: React.FC = () => {
             onChange={handleChange}
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="City">City</label>
           <input
@@ -110,7 +119,7 @@ const PersonalInfoSettings: React.FC = () => {
             onChange={handleChange}
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="YearsOfExperience">Years of Experience</label>
           <input
@@ -122,14 +131,14 @@ const PersonalInfoSettings: React.FC = () => {
           />
         </div>
       </Accordion>
-      
-      <button 
-        onClick={handleSave} 
+
+      <button
+        onClick={handleSave}
         className="btn btn-primary"
       >
         Save Personal Info
       </button>
-      
+
       {isSaved && (
         <div className="save-status">
           Personal info saved successfully!

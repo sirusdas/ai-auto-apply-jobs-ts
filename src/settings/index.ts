@@ -13,6 +13,12 @@ import AIProviderSettings from './components/AIProviderSettings';
 import '../assets/styles/popup.css';
 import '../assets/styles/settings.css';
 import * as tokenService from '../utils/tokenService';
+import { demoService } from '../services/demoService';
+import { DemoManager } from '../components/demo/DemoManager';
+import { InfoModal } from '../components/demo/InfoModal';
+import { SETTINGS_DEMO, OPTION_INFO_MAP } from '../constants/demoSteps';
+import { DemoButton } from '../components/DemoButton';
+import '../components/demo/demo.css';
 
 // Variable to hold the current React root
 let currentRoot: any = null;
@@ -260,8 +266,81 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render the default component
   renderComponent('settings');
 
+  // Render help button
+  renderSettingsHelpButton();
+
   console.log('Settings page initialized');
+
+  // Check if settings demo should be shown
+  checkSettingsDemo();
 });
+
+function renderSettingsHelpButton() {
+  const container = document.getElementById('settings-help-button-root');
+  if (!container) return;
+
+  const root = createRoot(container);
+  root.render(
+    React.createElement(DemoButton, {
+      onStartDemo: () => showDemo(SETTINGS_DEMO)
+    })
+  );
+}
+
+async function checkSettingsDemo() {
+  await demoService.initialize();
+  const state = demoService.getState();
+
+  if (!state.hasCompletedSettingsDemo) {
+    // Show settings demo after a short delay to allow UI to render
+    setTimeout(() => {
+      showDemo(SETTINGS_DEMO);
+    }, 1000);
+  }
+}
+
+function showDemo(flow: any) {
+  const container = document.createElement('div');
+  container.id = 'ai-job-applier-settings-demo-root';
+  document.body.appendChild(container);
+
+  const root = createRoot(container);
+  root.render(
+    React.createElement(DemoManager, {
+      flow,
+      onComplete: () => {
+        setTimeout(() => {
+          root.unmount();
+          container.remove();
+        }, 300);
+      }
+    })
+  );
+}
+
+// Function to show info modal
+function showInfoModal(optionId: string) {
+  const info = OPTION_INFO_MAP[optionId];
+  if (!info) return;
+
+  const container = document.createElement('div');
+  container.id = 'info-modal-root';
+  document.body.appendChild(container);
+
+  const root = createRoot(container);
+  root.render(
+    React.createElement(InfoModal, {
+      info,
+      onClose: () => {
+        root.unmount();
+        container.remove();
+      }
+    })
+  );
+}
+
+// Export showInfoModal to window for access from React components or injected buttons
+(window as any).showInfoModal = showInfoModal;
 
 // Listen for storage changes to update the badge
 chrome.storage.onChanged.addListener((changes, namespace) => {
