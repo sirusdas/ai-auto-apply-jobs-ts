@@ -172,6 +172,30 @@ function styleMainButton(btn: HTMLButtonElement) {
 async function startNewAutoApplyProcess() {
   console.log('Starting new auto-apply process...');
 
+  // Check if token is valid before starting
+  const isTokenValid = await checkTokenValidity();
+  
+  if (!isTokenValid) {
+    // Show notification about invalid token
+    chrome.runtime.sendMessage({
+      action: 'showNotification',
+      notification: {
+        type: 'basic',
+        title: 'API Token Required',
+        message: 'Please update your API token to continue using AI features.',
+        iconUrl: '128128.png'
+      }
+    });
+    
+    // Open settings page
+    chrome.runtime.sendMessage({ 
+      action: 'openPage', 
+      url: chrome.runtime.getURL('settings.html#settings') 
+    });
+    
+    return;
+  }
+
   // 1. Fetch configs
   const result = await chrome.storage.local.get(['jobConfigs']);
   const configs: JobConfig[] = result.jobConfigs || [];
@@ -1230,7 +1254,9 @@ async function extractJobDetails() {
       '.jobs-unified-top-card__subtitle',
       '.t-black--light span',
       '.job-details-jobs-unified-top-card__primary-description span',
-      '.jobs-details__main-content .jobs-details-top-card__job-info span'
+      '.jobs-details__main-content .jobs-box__html-content',
+      '.jobs-description__container',
+      '.job-details-about-the-job-module'
     ];
 
     let location = '';
@@ -1442,4 +1468,45 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initExtensionUI);
 } else {
   initExtensionUI();
+}
+
+// Add this function to check token validity before starting auto-apply
+async function checkTokenValidity(): Promise<boolean> {
+  // Log the next scheduled validation time
+  chrome.runtime.sendMessage({ action: 'logNextValidationTime' }, () => {});
+  
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'checkTokenValidity' }, (response) => {
+      resolve(response?.valid ?? false);
+    });
+  });
+}
+
+// Modify the main auto-apply function to check token first
+async function startAutoApply() {
+  // Check if token is valid before starting
+  const isTokenValid = await checkTokenValidity();
+  
+  if (!isTokenValid) {
+    // Show notification about invalid token
+    chrome.runtime.sendMessage({
+      action: 'showNotification',
+      notification: {
+        type: 'basic',
+        title: 'API Token Required',
+        message: 'Please update your API token to continue using AI features.',
+        iconUrl: '128128.png'
+      }
+    });
+    
+    // Open settings page
+    chrome.runtime.sendMessage({ 
+      action: 'openPage', 
+      url: chrome.runtime.getURL('settings.html#settings') 
+    });
+    
+    return;
+  }
+  
+  // Existing auto-apply logic continues here...
 }

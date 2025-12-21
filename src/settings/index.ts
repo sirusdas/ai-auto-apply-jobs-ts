@@ -12,6 +12,7 @@ import SearchTimerConfig from './components/SearchTimerConfig';
 import AIProviderSettings from './components/AIProviderSettings';
 import '../assets/styles/popup.css';
 import '../assets/styles/settings.css';
+import * as tokenService from '../utils/tokenService';
 
 // Variable to hold the current React root
 let currentRoot: any = null;
@@ -184,8 +185,6 @@ function initModeToggles() {
   }
 }
 
-import * as tokenService from '../utils/tokenService';
-
 // Function to update the API status badge
 async function updateApiStatusBadge() {
   const badge = document.getElementById('api-status-badge');
@@ -219,10 +218,44 @@ async function updateApiStatusBadge() {
   }
 }
 
+// Check token validity when settings page loads
+async function checkTokenOnLoad() {
+  const token = await tokenService.getToken();
+  if (token) {
+    // There's a token, let's validate it
+    try {
+      const result = await tokenService.validateToken();
+      if (result.valid) {
+        // Update token data in storage
+        chrome.storage.local.set({ [tokenService.TOKEN_DATA_KEY]: result.data });
+      } else {
+        // Token is invalid, update status
+        const existingData = await tokenService.getTokenData();
+        const updatedData = {
+          ...existingData,
+          valid: false,
+          last_error: {
+            message: result.error || 'Token validation failed',
+            timestamp: new Date().toISOString()
+          }
+        };
+        chrome.storage.local.set({ [tokenService.TOKEN_DATA_KEY]: updatedData });
+      }
+      // Update the badge and UI to reflect current status
+      updateApiStatusBadge();
+      // Re-render the token settings component to show current status
+      renderComponent('settings');
+    } catch (error) {
+      console.error('Error validating token on load:', error);
+    }
+  }
+}
+
 // Initialize when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   initModeToggles();
   updateApiStatusBadge();
+  checkTokenOnLoad(); // Check token validity when page loads
 
   // Render the default component
   renderComponent('settings');

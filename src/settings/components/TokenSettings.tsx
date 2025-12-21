@@ -37,7 +37,40 @@ const TokenSettings: React.FC = () => {
         setStatusMessage(null);
 
         try {
+            // Get current token data to check if we have a valid token
+            const currentTokenData = await tokenService.getTokenData();
+            const isCurrentTokenValid = currentTokenData?.valid && 
+                new Date(currentTokenData.expires_at).getTime() > Date.now();
+
+            // Validate the new token
             const result = await tokenService.validateToken(0, token.trim(), 'save-token');
+
+            // Special validation for initial token saving - check usage_count
+            const isNewTokenFresh = result.data?.usage_count === 1;
+
+            // If we have a valid current token and the new token is invalid, don't replace it
+            if (isCurrentTokenValid && !result.valid) {
+                setStatusMessage({ 
+                    type: 'error', 
+                    text: 'Current token is still valid. New token is invalid and was not saved.' 
+                });
+                setValidating(false);
+                
+                // Refresh the UI to show the current valid token status
+                const refreshedTokenData = await tokenService.getTokenData();
+                setTokenData(refreshedTokenData);
+                return;
+            }
+
+            // If we're trying to save a token for the first time, it must be fresh (usage_count = 1)
+            if ((!currentTokenData || !currentTokenData.valid) && result.valid && !isNewTokenFresh) {
+                setStatusMessage({ 
+                    type: 'error', 
+                    text: 'Token is valid but has been used before. Please use a fresh token.' 
+                });
+                setValidating(false);
+                return;
+            }
 
             if (result.valid) {
                 await tokenService.saveToken(token.trim());
@@ -52,9 +85,17 @@ const TokenSettings: React.FC = () => {
                 }, 3000);
             } else {
                 setStatusMessage({ type: 'error', text: result.error || 'Invalid token or token already used' });
+                
+                // Refresh the UI to show the current token status
+                const refreshedTokenData = await tokenService.getTokenData();
+                setTokenData(refreshedTokenData);
             }
         } catch (error: any) {
             setStatusMessage({ type: 'error', text: error.message || 'Error saving token' });
+            
+            // Refresh the UI to show the current token status
+            const refreshedTokenData = await tokenService.getTokenData();
+            setTokenData(refreshedTokenData);
         } finally {
             setValidating(false);
         }
@@ -81,9 +122,21 @@ const TokenSettings: React.FC = () => {
             if (result.valid) {
                 setTokenData(result.data);
                 setStatusMessage({ type: 'success', text: 'Token is valid' });
+                // Save the updated token data
+                chrome.storage.local.set({ [tokenService.TOKEN_DATA_KEY]: result.data });
             } else {
-                setTokenData(null);
+                // Update state to show token is invalid
+                const updatedTokenData = tokenData ? { 
+                    ...tokenData, 
+                    valid: false,
+                    last_error: { message: result.error || 'Token is invalid', timestamp: new Date().toISOString() }
+                } : null;
+                setTokenData(updatedTokenData);
                 setStatusMessage({ type: 'error', text: result.error || 'Token is invalid' });
+                // Update storage with invalid token data
+                if (updatedTokenData) {
+                    chrome.storage.local.set({ [tokenService.TOKEN_DATA_KEY]: updatedTokenData });
+                }
             }
         } catch (error: any) {
             setStatusMessage({ type: 'error', text: error.message || 'Validation failed' });
@@ -109,6 +162,10 @@ const TokenSettings: React.FC = () => {
     };
 
     const expiryInfo = getExpiryInfo();
+
+    // Check if token is actually valid (not just present)
+    const isTokenActuallyValid = tokenData?.valid && 
+        new Date(tokenData.expires_at).getTime() > Date.now();
 
     if (loading) {
         return <div className="loading">Loading settings...</div>;
@@ -163,14 +220,14 @@ const TokenSettings: React.FC = () => {
                             Check Status
                         </button>
 
-                        <button
+                        {/* <button
                             type="button"
                             className="btn btn-danger"
                             onClick={handleClear}
                             disabled={validating || !token}
                         >
                             Clear
-                        </button>
+                        </button> */}
                     </div>
                 </form>
 
@@ -181,7 +238,7 @@ const TokenSettings: React.FC = () => {
                 )}
             </div>
 
-            {tokenData && tokenData.valid && (
+            {tokenData && isTokenActuallyValid && (
                 <div className="token-info card">
                     <h3>Current Token Status</h3>
                     <div className="info-grid">
@@ -206,10 +263,10 @@ const TokenSettings: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="info-item">
+                        {/* <div className="info-item">
                             <span className="label">Usage:</span>
                             <span>{tokenData.usage_count} applications processed</span>
-                        </div>
+                        </div> */}
 
                         <div className="info-item">
                             <span className="label">Last Validated:</span>
@@ -219,13 +276,26 @@ const TokenSettings: React.FC = () => {
                 </div>
             )}
 
-            {(!tokenData || !tokenData.valid) && token && !validating && (
+            {tokenData && !isTokenActuallyValid && (
                 <div className="token-info error-card card">
                     <h3>Token Status: Invalid</h3>
                     <p>The current token is invalid or has expired. Please update your token to continue using all features.</p>
+                    {tokenData.last_error && (
+                        <p className="error-details">Error: {tokenData.last_error.message}</p>
+                    )}
                     <a href="https://qerds.com/tools/tgs" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
                         Renew Token
                     </a>
+                </div>
+            )}
+
+            {!tokenData && token && !validating && (
+                <div className="token-info error-card card">
+                    <h3>Token Status: Not Validated</h3>
+                    <p>Please validate your token to continue using all features.</p>
+                    <button className="btn btn-primary" onClick={handleManualValidate}>
+                        Validate Token
+                    </button>
                 </div>
             )}
 
@@ -296,6 +366,7 @@ const TokenSettings: React.FC = () => {
         .token-settings-enhanced .status-valid { color: #38a169; font-weight: bold; }
         .token-settings-enhanced .warning { color: #dd6b20; }
         .token-settings-enhanced .error { color: #e53e3e; }
+        .token-settings-enhanced .error-details { color: #e53e3e; font-style: italic; }
         
         .token-settings-enhanced .error-card {
           border-left: 4px solid #e53e3e;

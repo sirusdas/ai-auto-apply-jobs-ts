@@ -156,9 +156,13 @@ export async function getTokenData(): Promise<TokenData | null> {
  */
 export function scheduleNextValidation(): void {
     const now = Date.now();
-    const randomOffset = Math.floor(Math.random() * 60 * 60 * 1000); // Random time within the next hour
+    const randomOffset = Math.floor(Math.random() * 60 * 60 * 100); // Random time within the next hour
     const nextValidationTimestamp = now + randomOffset;
     chrome.storage.local.set({ [TOKEN_VALIDATION_TIMESTAMP_KEY]: nextValidationTimestamp });
+
+    // Log when the next validation is scheduled
+    const nextValidationDate = new Date(nextValidationTimestamp);
+    console.log(`Token validation scheduled for: ${nextValidationDate.toString()}`);
 }
 
 /**
@@ -170,8 +174,15 @@ export async function shouldValidate(): Promise<boolean> {
         chrome.storage.local.get([TOKEN_VALIDATION_TIMESTAMP_KEY], (result) => {
             const nextValidationTimestamp = result[TOKEN_VALIDATION_TIMESTAMP_KEY];
             if (!nextValidationTimestamp || now >= nextValidationTimestamp) {
+                if (!nextValidationTimestamp) {
+                    console.log('Token validation: No scheduled time found, validation required');
+                } else {
+                    console.log('Token validation: Scheduled time passed, validation required');
+                }
                 resolve(true); // Validation is required
             } else {
+                const nextValidationDate = new Date(nextValidationTimestamp);
+                console.log(`Token validation: Next validation scheduled for ${nextValidationDate.toString()}`);
                 resolve(false); // Use cached data
             }
         });
@@ -199,7 +210,46 @@ export async function validateTokenWithCache(token?: string): Promise<Validation
 }
 
 /**
- * Performs actual token validation via background script messaging
+ * Performs the actual network request for token validation
+ */
+export async function performTokenValidation(token: string): Promise<ValidationResult> {
+    try {
+        const response = await fetch(TOKEN_VALIDATION_ENDPOINT, {
+            method: 'GET',
+            headers: {
+                'x-api-key': token,
+            },
+        });
+
+        if (response.status === 401) {
+            const errorBody = await response.json().catch(() => ({}));
+            console.error('Token validation: 401 Unauthorized', errorBody);
+            return { valid: false, error: errorBody.error || 'Invalid token' };
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'No error body');
+            console.error(`Token validation failed with status: ${response.status}`, errorText);
+            return { valid: false, error: `Validation failed with status: ${response.status}` };
+        }
+
+        const data = await response.json();
+        console.log('Token validation response:', data);
+
+        // Extract token type from the response
+        const planType = data?.planType || data?.data?.planType || 'Free';
+        // Store the token type in chrome.storage.local for compatibility
+        chrome.storage.local.set({ planType: planType });
+
+        return { valid: data?.valid, data };
+    } catch (error: any) {
+        console.error('Error during token validation:', error);
+        return { valid: false, error: error.message };
+    }
+}
+
+/**
+ * Validates token with caching logic
  */
 export async function validateToken(
     retryCount = 0,
@@ -216,53 +266,39 @@ export async function validateToken(
     }
 
     try {
-        return new Promise((resolve) => {
-            chrome.runtime.sendMessage({ action: 'fetchToken', token: token }, async (response) => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error communicating with background script:', chrome.runtime.lastError);
-                    resolve({ valid: false, error: 'Background script communication error' });
-                    return;
-                }
+        const response = await performTokenValidation(token);
 
-                if (!response) {
-                    resolve({ valid: false, error: 'No response from background script' });
-                    return;
-                }
+        if (response.error) {
+            // Update cached error data
+            const errorInfo: ErrorInfo = {
+                message: response.error,
+                timestamp: new Date().toISOString()
+            };
+            const existingData = await getTokenData();
+            const updatedData: Partial<TokenData> = {
+                ...existingData,
+                valid: false,
+                last_error: errorInfo
+            };
+            chrome.storage.local.set({ [TOKEN_DATA_KEY]: updatedData });
+            return { valid: false, error: response.error };
+        }
 
-                if (response.error) {
-                    // Update cached error data
-                    const errorInfo: ErrorInfo = {
-                        message: response.error,
-                        timestamp: new Date().toISOString()
-                    };
-                    const existingData = await getTokenData();
-                    const updatedData: Partial<TokenData> = {
-                        ...existingData,
-                        valid: false,
-                        last_error: errorInfo
-                    };
-                    chrome.storage.local.set({ [TOKEN_DATA_KEY]: updatedData });
-                    resolve({ valid: false, error: response.error });
-                    return;
-                }
+        // Token is valid, store data
+        const tokenData: TokenData = {
+            valid: true,
+            planType: response.data?.planType || 'Free',
+            expires_at: response.data?.expires_at || '',
+            usage_count: response.data?.usage_count || 0,
+            last_validated: new Date().toISOString(),
+            last_error: null
+        };
 
-                // Token is valid, store data
-                const tokenData: TokenData = {
-                    valid: true,
-                    planType: response.data?.planType || 'Free',
-                    expires_at: response.data?.expires_at || '',
-                    usage_count: response.data?.usage_count || 0,
-                    last_validated: new Date().toISOString(),
-                    last_error: null
-                };
+        if (operation !== 'save-token') {
+            chrome.storage.local.set({ [TOKEN_DATA_KEY]: tokenData });
+        }
 
-                if (operation !== 'save-token') {
-                    chrome.storage.local.set({ [TOKEN_DATA_KEY]: tokenData });
-                }
-
-                resolve({ valid: true, data: tokenData });
-            });
-        });
+        return { valid: true, data: tokenData };
     } catch (error: any) {
         console.error('Validation error:', error);
 

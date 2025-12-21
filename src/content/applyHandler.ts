@@ -358,8 +358,23 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
 
     // Check if token is valid
     const tokenData = settings.tokenData;
-    if (!tokenData || !tokenData.valid) {
+    const isTokenValid = tokenData?.valid && new Date(tokenData.expires_at).getTime() > Date.now();
+    
+    if (!isTokenValid) {
         console.warn('API Token is missing or invalid. Please check your settings.');
+        // Show notification to user
+        chrome.runtime.sendMessage({
+            action: 'showNotification',
+            notification: {
+                type: 'basic',
+                title: 'API Token Required',
+                message: 'Please update your API token to continue using AI features.',
+                iconUrl: '128128.png'
+            }
+        });
+        
+        // Open settings page
+        chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#settings') });
         return null;
     }
 

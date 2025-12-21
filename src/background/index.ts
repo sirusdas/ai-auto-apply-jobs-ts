@@ -42,6 +42,12 @@ async function initTokenManagement() {
   // Check expiry on startup
   checkTokenExpiry();
 
+  // Check token validity on startup
+  checkTokenValidityOnStartup();
+
+  // Log when the next validation will occur
+  logNextValidationTime();
+
   // Set up periodic check for validation (every minute)
   setInterval(async () => {
     const shouldValidate = await tokenService.shouldValidate();
@@ -49,10 +55,52 @@ async function initTokenManagement() {
       const token = await tokenService.getToken();
       if (token) {
         console.log('Background: Performing periodic token validation');
-        await tokenService.validateToken();
+        const validationResult = await tokenService.validateToken();
+
+        if (!validationResult.valid) {
+          stopExtension('Your API token has been revoked or is invalid. The extension has been stopped.');
+        } else {
+          // After validation, schedule the next one and log it
+          tokenService.scheduleNextValidation();
+          logNextValidationTime();
+        }
       }
     }
   }, 60000);
+}
+
+async function logNextValidationTime() {
+  chrome.storage.local.get([tokenService.TOKEN_VALIDATION_TIMESTAMP_KEY], (result) => {
+    const nextValidationTimestamp = result[tokenService.TOKEN_VALIDATION_TIMESTAMP_KEY];
+    if (nextValidationTimestamp) {
+      const nextValidationDate = new Date(nextValidationTimestamp);
+      console.log(`Next token validation scheduled for: ${nextValidationDate.toString()}`);
+    } else {
+      console.log('No token validation scheduled yet');
+    }
+  });
+}
+
+async function checkTokenValidityOnStartup() {
+  const tokenData = await tokenService.getTokenData();
+  if (!tokenData || !tokenData.valid) {
+    // Token is missing or invalid, show notification and offer to go to settings
+    chrome.notifications.create('token-invalid', {
+      type: 'basic',
+      iconUrl: '128128.png',
+      title: 'API Token Required',
+      message: 'Please update your API token to continue using AI features.',
+      priority: 2,
+      buttons: [{ title: 'Update Token' }]
+    });
+
+    // Listen for notification click to open settings
+    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+      if (notificationId === 'token-invalid' && buttonIndex === 0) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
+      }
+    });
+  }
 }
 
 async function checkTokenExpiry() {
@@ -70,7 +118,15 @@ async function checkTokenExpiry() {
       iconUrl: '128128.png',
       title: 'API Token Expired',
       message: 'Your API token has expired. Please renew it to continue using AI features.',
-      priority: 2
+      priority: 2,
+      buttons: [{ title: 'Renew Token' }]
+    });
+
+    // Listen for notification click to open settings
+    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+      if (notificationId === 'token-expired' && buttonIndex === 0) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
+      }
     });
   } else if (diffDays <= 7) {
     chrome.notifications.create('token-expiring', {
@@ -78,9 +134,47 @@ async function checkTokenExpiry() {
       iconUrl: '128128.png',
       title: 'API Token Expiring Soon',
       message: `Your API token will expire in ${diffDays} days. Please renew it soon.`,
-      priority: 1
+      priority: 1,
+      buttons: [{ title: 'Renew Token' }]
+    });
+
+    // Listen for notification click to open settings
+    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+      if (notificationId === 'token-expiring' && buttonIndex === 0) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
+      }
     });
   }
+}
+
+async function stopExtension(reason: string) {
+  console.warn(`Stopping extension: ${reason}`);
+  // Clear job application state to stop the content script loop
+  chrome.storage.local.remove(['jobApplicationState'], () => {
+    console.log('Job application state cleared.');
+  });
+
+  // Notify the user
+  chrome.notifications.create('extension-stopped', {
+    type: 'basic',
+    iconUrl: '128128.png',
+    title: 'Extension Stopped',
+    message: reason,
+    priority: 2
+  });
+}
+
+async function ensureTokenValid(): Promise<boolean> {
+  const tokenData = await tokenService.getTokenData();
+  if (!tokenData) return false;
+
+  const isValid = tokenData.valid && new Date(tokenData.expires_at).getTime() > Date.now();
+
+  if (!isValid) {
+    stopExtension('API token expired or invalid. Please update your settings.');
+  }
+
+  return isValid;
 }
 
 initAIService();
@@ -91,15 +185,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fetchToken') {
     const token = request.token;
     console.log('Received token:', token);
-    fetchToken(token)
+    tokenService.performTokenValidation(token)
       .then((response) => {
-        // Extract token type from the response
-        const planType = response?.data?.planType || response?.planType || 'Free';
-        // Store the token type in chrome.storage.local for compatibility
-        chrome.storage.local.set({ planType: planType }, () => {
-          console.log('Token type stored:', planType);
-          sendResponse(response);
-        });
+        sendResponse(response);
       })
       .catch((error: any) => {
         console.error('Error validating token:', error);
@@ -134,16 +222,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'checkJobMatch') {
-    const { jobDetails, resume, accessToken } = request;
+    const { jobDetails, resume } = request;
     console.log('Received checkJobMatch request for:', jobDetails.jobTitle);
 
-    handleJobMatch(jobDetails, resume)
-      .then((data) => {
-        sendResponse({ success: true, data });
-      })
-      .catch((error) => {
-        console.error('Error in checkJobMatch:', error);
-        sendResponse({ success: false, error: error.message || 'Unknown error' });
+    ensureTokenValid()
+      .then(isValid => {
+        if (!isValid) {
+          sendResponse({ success: false, error: 'API token expired or invalid' });
+          return;
+        }
+        handleJobMatch(jobDetails, resume)
+          .then((data) => {
+            sendResponse({ success: true, data });
+          })
+          .catch((error) => {
+            console.error('Error in checkJobMatch:', error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          });
       });
     return true; // Keep channel open
   }
@@ -152,13 +247,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const { inputs, radios, dropdowns, checkboxes, resume } = request;
     console.log('Received answerJobQuestions request');
 
-    handleQuestionAnswering(inputs, radios, dropdowns, checkboxes, resume)
-      .then((data) => {
-        sendResponse({ success: true, data });
-      })
-      .catch((error) => {
-        console.error('Error in answerJobQuestions:', error);
-        sendResponse({ success: false, error: error.message || 'Unknown error' });
+    ensureTokenValid()
+      .then(isValid => {
+        if (!isValid) {
+          sendResponse({ success: false, error: 'API token expired or invalid' });
+          return;
+        }
+        handleQuestionAnswering(inputs, radios, dropdowns, checkboxes, resume)
+          .then((data) => {
+            sendResponse({ success: true, data });
+          })
+          .catch((error) => {
+            console.error('Error in answerJobQuestions:', error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          });
       });
     return true; // Keep channel open
   }
@@ -167,27 +269,77 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const { companies } = request;
     console.log('Received filterCompanies request for', companies.length, 'companies');
 
-    handleCompanyFiltering(companies)
-      .then((data) => {
-        sendResponse({ success: true, data });
-      })
-      .catch((error) => {
-        console.error('Error in filterCompanies:', error);
-        sendResponse({ success: false, error: error.message || 'Unknown error' });
+    ensureTokenValid()
+      .then(isValid => {
+        if (!isValid) {
+          sendResponse({ success: false, error: 'API token expired or invalid' });
+          return;
+        }
+        handleCompanyFiltering(companies)
+          .then((data) => {
+            sendResponse({ success: true, data });
+          })
+          .catch((error) => {
+            console.error('Error in filterCompanies:', error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          });
       });
     return true;
   }
 
   if (request.action === 'generateResume') {
     const { prompt } = request;
-    aiService.sendRequest({ prompt: prompt })
-      .then((response) => {
-        sendResponse({ success: true, data: response });
-      })
-      .catch((error) => {
-        console.error('Error in generateResume:', error);
-        sendResponse({ success: false, error: error.message || 'Unknown error' });
+    ensureTokenValid()
+      .then(isValid => {
+        if (!isValid) {
+          sendResponse({ success: false, error: 'API token expired or invalid' });
+          return;
+        }
+        aiService.sendRequest({ prompt: prompt })
+          .then((response) => {
+            sendResponse({ success: true, data: response });
+          })
+          .catch((error) => {
+            console.error('Error in generateResume:', error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          });
       });
+    return true;
+  }
+
+  if (request.action === 'showNotification') {
+    chrome.notifications.create('', request.notification, () => { });
+    return true;
+  }
+
+  if (request.action === 'checkTokenValidity') {
+    tokenService.getTokenData()
+      .then(tokenData => {
+        const isValid = tokenData?.valid && new Date(tokenData.expires_at).getTime() > Date.now();
+        sendResponse({ valid: isValid });
+      })
+      .catch(() => {
+        sendResponse({ valid: false });
+      });
+    return true;
+  }
+
+  if (request.action === 'logNextValidationTime') {
+    chrome.storage.local.get([tokenService.TOKEN_VALIDATION_TIMESTAMP_KEY], (result) => {
+      const nextValidationTimestamp = result[tokenService.TOKEN_VALIDATION_TIMESTAMP_KEY];
+      if (nextValidationTimestamp) {
+        const nextValidationDate = new Date(nextValidationTimestamp);
+        console.log(`Next token validation scheduled for: ${nextValidationDate.toString()}`);
+      } else {
+        console.log('No token validation scheduled yet');
+      }
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (request.action === 'openPage') {
+    chrome.tabs.create({ url: request.url });
     return true;
   }
 });
@@ -257,75 +409,7 @@ async function handleJobMatch(jobDetails: any, resume: string) {
   }
 }
 
-// Function to decrypt token
-function decryptToken(encryptedToken: string): string {
-  // Replace this with the corresponding decryption algorithm
-  return atob(encryptedToken); // Simple base64 decoding
-}
 
-// Get stored token data from chrome.storage.local
-async function getToken(): Promise<string | null> {
-  console.log('getToken function called');
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.get([API_TOKEN_KEY], (result) => {
-      console.log('Retrieved token:', result[API_TOKEN_KEY]); // Debug log
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        const encryptedToken = result[API_TOKEN_KEY];
-        resolve(encryptedToken ? decryptToken(encryptedToken) : null);
-      }
-    });
-  });
-}
-
-async function fetchToken(req_token: string = ''): Promise<any> {
-  let token = '';
-  if (req_token) {
-    token = req_token;
-  } else {
-    const tokenResult = await getToken();
-    if (tokenResult) {
-      token = tokenResult;
-    }
-  }
-
-  if (!token) {
-    console.warn('No token found');
-    return { valid: false, error: 'No token found' };
-  }
-
-  try {
-    const response = await fetch(TOKEN_VALIDATION_ENDPOINT, {
-      method: 'GET',
-      headers: {
-        'x-api-key': token,
-      },
-    });
-
-    if (response.status === 401) {
-      return { valid: false, error: 'Invalid token' }; // Don't retry on 401
-    }
-
-    if (!response.ok) {
-      console.error(`Token validation failed with status: ${response.status}`);
-      return { valid: false, error: `Validation failed with status: ${response.status}` };
-    }
-
-    const data = await response.json();
-    return { valid: data?.valid, data };
-  } catch (error: any) {
-    console.error('Error during token validation:', error);
-    return { valid: false, error: error.message };
-  }
-}
-
-// Listen for a message to open a page (like settings.html)
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'openPage') {
-    chrome.tabs.create({ url: message.url });
-  }
-});
 
 // Open settings page with demo on first install
 chrome.runtime.onInstalled.addListener((details) => {
