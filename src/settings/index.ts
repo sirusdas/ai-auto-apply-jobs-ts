@@ -10,6 +10,7 @@ import AppliedJobs from '../popup/components/AppliedJobs';
 import AccessTokenSettings from './components/AccessTokenSettings';
 import FormControlConfigurations from './components/FormControlConfigurations';
 import SearchTimerConfig from './components/SearchTimerConfig';
+import AIProviderSettings from './components/AIProviderSettings';
 import '../assets/styles/popup.css';
 import '../assets/styles/settings.css';
 
@@ -21,83 +22,88 @@ function renderComponent(componentName: string) {
   const container = document.getElementById('settings-container');
   console.log('Rendering component:', componentName);
   console.log('Container element:', container);
-  
+
   if (!container) {
     console.error('Settings container not found');
     return;
   }
-  
+
   // Unmount the previous root if it exists BEFORE clearing the container
   if (currentRoot) {
     console.log('Unmounting previous root');
     currentRoot.unmount();
   }
-  
+
   // Clear the container AFTER unmounting the React component
   container.innerHTML = '';
-  
+
   // Create a new root and render the component
   currentRoot = createRoot(container);
   console.log('Created new root:', currentRoot);
-  
+
   let componentElement: React.ReactElement | null = null;
-  
+
   switch (componentName) {
     case 'settings':
       console.log('Rendering TokenSettings component');
       componentElement = React.createElement(TokenSettings, {});
       break;
-      
+
     case 'gemini':
-      console.log('Rendering AccessTokenSettings component');
-      componentElement = React.createElement(AccessTokenSettings, {});
+      console.log('Rendering AIProviderSettings component');
+      componentElement = React.createElement(AIProviderSettings, {});
       break;
-      
+
+    case 'ai-providers':
+      console.log('Rendering AIProviderSettings component');
+      componentElement = React.createElement(AIProviderSettings, {});
+      break;
+
     case 'personal-info':
       console.log('Rendering PersonalInfoSettings component');
       componentElement = React.createElement(PersonalInfoSettings, {});
       break;
-      
+
     case 'resume':
       console.log('Rendering ResumeManagement component');
       componentElement = React.createElement(ResumeManagement, {});
       break;
-      
+
     case 'job-match':
       console.log('Rendering JobMatchSettings component');
       componentElement = React.createElement(JobMatchSettings, {});
       break;
-      
+
     case 'company-preferences':
       console.log('Rendering CompanyPreferences component');
       componentElement = React.createElement(CompanyPreferences, {});
       break;
-      
+
     case 'delay':
       console.log('Rendering DelaySettings component');
       componentElement = React.createElement(DelaySettings, {});
       break;
-      
+
     case 'applied-jobs':
       console.log('Rendering AppliedJobs component');
       componentElement = React.createElement(AppliedJobs, {});
       break;
-      
+
     case 'form-control':
       console.log('Rendering FormControlConfigurations component');
       componentElement = React.createElement(FormControlConfigurations, {});
       break;
-      
+
     case 'search-timer':
       console.log('Rendering SearchTimerConfig component');
       componentElement = React.createElement(SearchTimerConfig, {});
       break;
-      
+
     default:
       console.log('Rendering default TokenSettings component');
       componentElement = React.createElement(TokenSettings, {});
   }
-  
+
   // Render the component
   if (componentElement) {
     currentRoot.render(componentElement);
@@ -116,19 +122,19 @@ function initModeToggles() {
     } else {
       document.body.classList.remove('developer-mode-on');
     }
-    
+
     // Update the mode display text
     const modeDisplay = document.getElementById('current-mode-display');
     if (modeDisplay) {
       modeDisplay.textContent = isEnabled ? 'Developer Mode: ON' : 'Developer Mode: OFF';
     }
   }
-  
+
   // Load saved settings
   chrome.storage.local.get(['developerMode', 'darkMode'], (result) => {
     // Handle developer mode
     const developerToggle = document.getElementById('developerModeToggle') as HTMLInputElement;
-    
+
     if (developerToggle) {
       if (result.developerMode !== undefined) {
         developerToggle.checked = result.developerMode;
@@ -141,10 +147,10 @@ function initModeToggles() {
         chrome.storage.local.set({ developerMode: true });
       }
     }
-    
+
     // Handle dark mode
     const darkToggle = document.getElementById('darkModeToggle') as HTMLInputElement;
-    
+
     if (darkToggle) {
       if (result.darkMode !== undefined) {
         darkToggle.checked = result.darkMode;
@@ -152,7 +158,7 @@ function initModeToggles() {
           document.body.classList.add('dark-mode');
         }
       }
-      
+
       // Add event listener for dark mode toggle
       darkToggle.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
@@ -166,7 +172,7 @@ function initModeToggles() {
       });
     }
   });
-  
+
   // Add event listener for developer mode toggle
   const developerToggle = document.getElementById('developerModeToggle') as HTMLInputElement;
   if (developerToggle) {
@@ -182,10 +188,10 @@ function initModeToggles() {
 // Initialize when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   initModeToggles();
-  
+
   // Render the default component
   renderComponent('settings');
-  
+
   console.log('Settings page initialized');
 });
 

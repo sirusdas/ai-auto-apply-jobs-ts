@@ -112,37 +112,19 @@ ${resumeText}`;
         // Clean up the response
         compressedYaml = compressedYaml.replace(/^```yaml\n/, '').replace(/\n```$/, '');
       } else {
-        // Use Gemini API for Free users
-        const accessTokenResult = await new Promise<{ accessToken?: string }>((resolve) => {
-          chrome.storage.local.get(['accessToken'], resolve);
+        // Use AI Service via Background script
+        const response: any = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({
+            action: 'generateResume',
+            prompt: prompt
+          }, (res) => {
+            if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+            else if (res && res.success) resolve(res.data);
+            else reject(new Error(res?.error || 'Failed to generate resume'));
+          });
         });
 
-        const accessToken = accessTokenResult.accessToken;
-        if (!accessToken) {
-          setStatus({ type: 'error', message: 'Gemini API Key not found. Please save it in the "Google Gemini Access Token" section.' });
-          return;
-        }
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${accessToken}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }]
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Gemini API request failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        compressedYaml = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        compressedYaml = response.content || '';
 
         // Clean up the response
         compressedYaml = compressedYaml.replace(/^```yaml\n/, '').replace(/\n```$/, '');

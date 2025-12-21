@@ -354,8 +354,11 @@ async function discardApplication() {
 // --- Phase 3: AI Fetch ---
 
 async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise<Answers | null> {
-    const tokenRes = await chrome.storage.local.get(['accessToken', 'compressedResumeYAML', 'plainTextResume']);
-    if (!tokenRes.accessToken) return null;
+    const settings = await chrome.storage.local.get(['aiSettings', 'compressedResumeYAML', 'plainTextResume']);
+    if (!settings.aiSettings) {
+        console.warn('AI settings not found. Please configure AI providers in settings.');
+        return null;
+    }
 
     try {
         const response: any = await new Promise((resolve, reject) => {
@@ -365,8 +368,7 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                 radios: questions.radios,
                 dropdowns: questions.dropdowns,
                 checkboxes: questions.checkboxes,
-                resume: tokenRes.compressedResumeYAML || tokenRes.plainTextResume || "",
-                accessToken: tokenRes.accessToken
+                resume: settings.compressedResumeYAML || settings.plainTextResume || ""
             }, (res) => {
                 if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
                 else if (res && res.success) resolve(res.data);

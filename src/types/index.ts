@@ -44,6 +44,40 @@ export interface InputFieldConfig {
   count: number;
 }
 
+export interface AIProvider {
+  id: string; // 'gemini' | 'claude' | 'chatgpt' | 'openai'
+  name: string; // Display name
+  enabled: boolean;
+  apiKey: string;
+  model?: string; // Optional model selection
+  priority?: number; // For fallback ordering
+}
+
+export interface AISettings {
+  providers: AIProvider[];
+  primaryProvider: string; // ID of primary AI provider
+  enableFallback: boolean; // Use other providers if primary fails
+  timeout?: number; // Per-request timeout in ms
+}
+
+export interface AIRequest {
+  provider?: string;
+  prompt: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+export interface AIResponse {
+  provider: string;
+  content: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  error?: string;
+}
+
 export interface RadioButtonConfig {
   placeholderIncludes: string;
   defaultValue: string;
