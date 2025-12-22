@@ -112,7 +112,7 @@ export const WalkthroughOverlay: React.FC<WalkthroughOverlayProps> = ({
                     <button className="walkthrough-close" onClick={onSkip} aria-label="Close walkthrough">✕</button>
                 </div>
 
-                <div className="walkthrough-body">
+                {/* <div className="walkthrough-body">
                     <p>{step.description}</p>
 
                     {step.videoUrl && (
@@ -122,7 +122,7 @@ export const WalkthroughOverlay: React.FC<WalkthroughOverlayProps> = ({
                             </a>
                         </div>
                     )}
-                </div>
+                </div> */}
 
                 <div className="walkthrough-footer">
                     <div className="walkthrough-progress">
