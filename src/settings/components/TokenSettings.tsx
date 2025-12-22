@@ -191,7 +191,19 @@ const TokenSettings: React.FC = () => {
             <div className="card">
                 <form onSubmit={handleSave}>
                     <div className="form-group">
-                        <label htmlFor="api-token">API Token:</label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                            <label htmlFor="api-token" style={{ margin: 0 }}>API Token:</label>
+                            {!token && (
+                                <a
+                                    href="https://qerds.com/tools/tgs"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="get-key-link"
+                                >
+                                    Get Token
+                                </a>
+                            )}
+                        </div>
                         <div className="input-with-toggle">
                             <input
                                 type={showToken ? "text" : "password"}
@@ -377,6 +389,22 @@ const TokenSettings: React.FC = () => {
         .token-settings-enhanced .error { color: #e53e3e; }
         .token-settings-enhanced .error-details { color: #e53e3e; font-style: italic; }
         
+        .get-key-link {
+          font-size: 0.8em;
+          color: #2b6cb0;
+          text-decoration: none;
+          font-weight: 500;
+          padding: 2px 8px;
+          border: 1px solid #2b6cb0;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+        .get-key-link:hover {
+          background: #2b6cb0;
+          color: white;
+          text-decoration: none;
+        }
+
         .token-settings-enhanced .error-card {
           border-left: 4px solid #e53e3e;
         }

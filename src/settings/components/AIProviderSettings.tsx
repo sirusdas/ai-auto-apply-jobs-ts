@@ -96,7 +96,33 @@ const AIProviderSettings: React.FC = () => {
             {provider.enabled && (
               <div className="provider-details">
                 <div className="form-group">
-                  <label htmlFor={`${provider.id}-api-key`}>API Key:</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                    <label htmlFor={`${provider.id}-api-key`} style={{ display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }}>
+                      API Key:
+                      <button
+                        className="help-icon-small"
+                        onClick={() => (window as any).showInfoModal(`${provider.id}-help`)}
+                        title={`Help - How to get ${provider.name} API Key`}
+                        type="button"
+                      >
+                        ❓
+                      </button>
+                    </label>
+                    {!provider.apiKey && (
+                      <a
+                        href={
+                          provider.id === 'gemini' ? 'https://aistudio.google.com/app/apikey' :
+                            provider.id === 'claude' ? 'https://console.anthropic.com/settings/keys' :
+                              'https://platform.openai.com/api-keys'
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="get-key-link"
+                      >
+                        Get {provider.name} Key
+                      </a>
+                    )}
+                  </div>
                   <input
                     type="password"
                     id={`${provider.id}-api-key`}
@@ -174,6 +200,34 @@ const AIProviderSettings: React.FC = () => {
           padding: 16px;
           margin-bottom: 20px;
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .help-icon-small {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 0.9em;
+          padding: 0;
+          margin: 0;
+          opacity: 0.7;
+          transition: opacity 0.2s;
+        }
+        .help-icon-small:hover {
+          opacity: 1;
+        }
+        .get-key-link {
+          font-size: 0.8em;
+          color: #2196F3;
+          text-decoration: none;
+          font-weight: 500;
+          padding: 2px 8px;
+          border: 1px solid #2196F3;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+        .get-key-link:hover {
+          background: #2196F3;
+          color: white;
+          text-decoration: none;
         }
         .warning-notice {
           border-left: 4px solid #f59e0b;

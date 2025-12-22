@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface VideoPlayerProps {
     videoUrl: string;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl }) => {
-    const [showEmbed, setShowEmbed] = useState(false);
-
     // Extract YouTube video ID
     const getYouTubeId = (url: string): string | null => {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -20,8 +18,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl }) => {
         return (
             <div className="video-player-error">
                 <p>Could not load tutorial video.</p>
-                <a href={videoUrl} target="_blank" rel="noopener noreferrer">
-                    Watch on YouTube
+                <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="video-external-link">
+                    Watch on YouTube →
                 </a>
             </div>
         );
@@ -29,38 +27,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl }) => {
 
     return (
         <div className="video-player-container">
-            {!showEmbed ? (
-                <div className="video-player-preview" onClick={() => setShowEmbed(true)}>
-                    <img
-                        src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-                        alt="Tutorial Video Preview"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                        }}
-                    />
-                    <button
-                        className="video-play-button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setShowEmbed(true);
-                        }}
-                    >
-                        <span>▶</span> Play Tutorial
-                    </button>
+            <a
+                href={videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="video-player-preview"
+            >
+                <img
+                    src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+                    alt="Tutorial Video Preview"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                    }}
+                />
+                <div className="video-play-overlay">
+                    <div className="video-play-button">
+                        <span>▶</span>
+                    </div>
+                    <div className="video-play-text">Click to watch on YouTube</div>
                 </div>
-            ) : (
-                <div className="video-player-embed">
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`}
-                        title="Tutorial Video"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                    />
-                </div>
-            )}
+            </a>
 
             <div className="video-player-actions">
                 <a

@@ -18,6 +18,9 @@
     "https://qerds.com/*",
     "https://*.linkedin.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://www.youtube.com https://www.youtube-nocookie.com"
+  },
   "background": {
     "service_worker": "background.js"
   },

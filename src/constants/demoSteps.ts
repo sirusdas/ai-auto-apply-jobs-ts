@@ -197,5 +197,29 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         usage: 'Configure your target keywords and locations. If locations are present, Workplace and Job Type timers are automatically calculated as the sum of their children (locations). The extension iterates through each Workplace, then each Job Type, and finally each Location.',
         bestPractices: 'Use the "Run in Loop" option for 24/7 background application. Example: Searching Onsite + Remote for Full-time in London and Manchester will create 4 search segments (Onsite Full-time London, Onsite Full-time Manchester, etc.).',
         videoUrl: 'https://youtube.com/watch?v=automation-guide'
+    },
+    'gemini-help': {
+        optionId: 'gemini-help',
+        title: 'How to get Google Gemini API Key',
+        description: 'Google Gemini provides a free tier for developers. You can get an API key from Google AI Studio.',
+        usage: 'Visit Google AI Studio (aistudio.google.com), click "Get API key", and create a new key. Link: https://aistudio.google.com/app/apikey',
+        bestPractices: 'Choose a model like gemini-2.0-flash-exp for fast and reliable job matching.',
+        videoUrl: 'https://www.youtube.com/watch?v=JomWSwhwThg'
+    },
+    'claude-help': {
+        optionId: 'claude-help',
+        title: 'How to get Anthropic Claude API Key',
+        description: 'Anthropic Claude is known for high-quality responses. You need an account on Anthropic Console.',
+        usage: 'Log in to console.anthropic.com, go to Settings > API Keys, and click "Create Key". Link: https://console.anthropic.com/settings/keys',
+        bestPractices: 'Ensure you have added credits to your account as Claude does not have a free API tier.',
+        videoUrl: 'https://www.youtube.com/watch?v=vgncj7MJbVU'
+    },
+    'openai-help': {
+        optionId: 'openai-help',
+        title: 'How to get OpenAI ChatGPT API Key',
+        description: 'OpenAI offers various models like GPT-4o. You need to create a secret key in your OpenAI dashboard.',
+        usage: 'Log in to platform.openai.com, navigate to API Keys in the sidebar, and click "Create new secret key". Link: https://platform.openai.com/api-keys',
+        bestPractices: 'Set usage limits in your billing settings to control costs.',
+        videoUrl: 'https://www.youtube.com/watch?v=OB99E7Y1cMA'
     }
 };

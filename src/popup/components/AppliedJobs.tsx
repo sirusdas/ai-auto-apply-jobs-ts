@@ -41,7 +41,8 @@ const AppliedJobs: React.FC = () => {
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<AppliedJob[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [dateFilter, setDateFilter] = useState<string>('');
+  const today = new Date().toISOString().split('T')[0];
+  const [dateFilter, setDateFilter] = useState<string>(today);
   const [chartType, setChartType] = useState<string>('line');
   const [timeRange, setTimeRange] = useState<string>('month');
   const [selectedJob, setSelectedJob] = useState<AppliedJob | null>(null);

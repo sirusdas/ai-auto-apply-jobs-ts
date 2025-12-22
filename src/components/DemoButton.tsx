@@ -34,7 +34,7 @@ export const DemoButton: React.FC<DemoButtonProps> = ({ onStartDemo }) => {
                         >
                             <span>🎬</span> Start Tour
                         </button>
-                        <a
+                        {/* <a
                             href="https://youtube.com/playlist?list=YOUR_PLAYLIST_ID"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -50,7 +50,7 @@ export const DemoButton: React.FC<DemoButtonProps> = ({ onStartDemo }) => {
                             }}
                         >
                             <span>📖</span> Guide Book
-                        </button>
+                        </button> */}
                         <a
                             href="https://github.com/sirusdas/ai-auto-apply-jobs-ts/issues/new"
                             target="_blank"
@@ -59,14 +59,14 @@ export const DemoButton: React.FC<DemoButtonProps> = ({ onStartDemo }) => {
                         >
                             <span>🐛</span> Raise an Issue
                         </a>
-                        <a
+                        {/* <a
                             href="mailto:support@example.com"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="demo-menu-item"
                         >
                             <span>📧</span> Contact Us
-                        </a>
+                        </a> */}
                     </div>
                 </div>
             )}
