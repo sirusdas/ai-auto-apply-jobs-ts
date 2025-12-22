@@ -156,7 +156,7 @@ export async function getTokenData(): Promise<TokenData | null> {
  */
 export function scheduleNextValidation(): void {
     const now = Date.now();
-    const randomOffset = Math.floor(Math.random() * 60 * 60 * 100); // Random time within the next hour
+    const randomOffset = Math.floor(Math.random() * 60 * 60 * 1000); // Random time within the next hour
     const nextValidationTimestamp = now + randomOffset;
     chrome.storage.local.set({ [TOKEN_VALIDATION_TIMESTAMP_KEY]: nextValidationTimestamp });
 
