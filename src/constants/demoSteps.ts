@@ -193,9 +193,9 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
     'search-timer': {
         optionId: 'search-timer',
         title: 'Search Automation Timers',
-        description: 'Automate multiple job title searches with specific time limits.',
-        usage: 'Configure job titles, locations, and how long to search for each before moving to the next.',
-        bestPractices: 'Use the "Run in Loop" option for 24/7 background application.',
+        description: 'Automate multiple job title searches with specific time limits. Elements are processed in a hierarchy: Workplace Type > Job Type > Locations.',
+        usage: 'Configure your target keywords and locations. If locations are present, Workplace and Job Type timers are automatically calculated as the sum of their children (locations). The extension iterates through each Workplace, then each Job Type, and finally each Location.',
+        bestPractices: 'Use the "Run in Loop" option for 24/7 background application. Example: Searching Onsite + Remote for Full-time in London and Manchester will create 4 search segments (Onsite Full-time London, Onsite Full-time Manchester, etc.).',
         videoUrl: 'https://youtube.com/watch?v=automation-guide'
     }
 };

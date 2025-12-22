@@ -29,6 +29,11 @@ interface JobConfig {
     jobTypeName: string;
     jobTypeTimer: string;
   }>;
+  workplaceTypes: Array<{
+    id: string;
+    workplaceTypeName: string;
+    workplaceTypeTimer: string;
+  }>;
 }
 
 interface AutoApplyState {
@@ -37,6 +42,7 @@ interface AutoApplyState {
   jobIndex: number;
   locationIndex: number;
   typeIndex: number;
+  workplaceIndex: number;
   startTime: number;     // Timestamp when current segment started
   segmentDuration: number; // Total duration intended for this segment in ms
   configs: JobConfig[];  // Store configs for easy access
@@ -79,6 +85,18 @@ function mapJobType(typeName: string): string {
   if (lower.includes('intern')) return 'I';
   if (lower.includes('volunteer')) return 'V';
   if (lower.includes('other')) return 'O';
+
+  return ''; // Default or no filter
+}
+
+// Helper to map workplace type name to LinkedIn f_WT code
+function mapWorkplaceType(typeName: string): string {
+  if (!typeName) return '';
+  const lower = typeName.toLowerCase();
+
+  if (lower === 'onsite') return '1';
+  if (lower === 'remote') return '2';
+  if (lower === 'hybrid') return '3';
 
   return ''; // Default or no filter
 }
@@ -160,7 +178,7 @@ function addDemoButtonToSidebar() {
     position: fixed;
     top: 20px;
     right: 260px;
-    z-index: 10000;
+    z-index: 9999;
     display: none;
   `;
 
@@ -262,8 +280,19 @@ async function startNewAutoApplyProcess() {
   const result = await chrome.storage.local.get(['jobConfigs']);
   const configs: JobConfig[] = result.jobConfigs || [];
 
-  if (configs.length === 0) {
-    alert('No job configurations found. Please check Settings.');
+  // Enhanced Validation: Must have at least one config with at least one location and one job title
+  const isValid = configs.length > 0 && configs.every(c =>
+    c.jobTitleName.trim() !== '' &&
+    c.locations && c.locations.length > 0 &&
+    c.locations.every(l => l.locationName.trim() !== '' && l.locationTimer.trim() !== '' && !isNaN(parseFloat(l.locationTimer)))
+  );
+
+  if (!isValid) {
+    alert('Configuration Error:\nAt least one Job Title and one Location with a valid Timer are required for the extension to work.\n\nOpening Search and Timer Configuration...');
+    chrome.runtime.sendMessage({
+      action: 'openPage',
+      url: chrome.runtime.getURL('settings.html#search-timer')
+    });
     return;
   }
 
@@ -274,13 +303,14 @@ async function startNewAutoApplyProcess() {
     jobIndex: 0,
     locationIndex: 0,
     typeIndex: 0,
+    workplaceIndex: 0,
     startTime: Date.now(),
     segmentDuration: 0, // Will be calculated
     configs: []
   };
 
   // Calculate duration for first segment
-  newState.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0);
+  newState.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0, 0);
   newState.configs = configs;
 
   saveState(newState);
@@ -315,23 +345,38 @@ async function resumeAutoApplyProcess(state: AutoApplyState) {
   processCurrentSegment(state, configs);
 }
 
-function calculateSegmentDuration(configs: JobConfig[], jIdx: number, lIdx: number, tIdx: number): number {
+function calculateSegmentDuration(configs: JobConfig[], jIdx: number, lIdx: number, tIdx: number, wIdx: number): number {
   const jobConfig = configs[jIdx];
   if (!jobConfig) return 5 * 60 * 1000; // default safe fallback
 
   const defaultDuration = 10 * 60 * 1000; // 10 mins default
 
-  // Hierarchy: Job Type > Location > Job Config
+  // Hierarchy (Most specific to least specific): Location > Job Type > Workplace Type > Job Config
   let timerStr = '';
 
-  if (jobConfig.jobTypes && jobConfig.jobTypes[tIdx]) {
-    timerStr = jobConfig.jobTypes[tIdx].jobTypeTimer;
-  }
-
-  if (!timerStr && jobConfig.locations && jobConfig.locations[lIdx]) {
+  // 1. Check if locations are present and valid
+  const hasLocations = jobConfig.locations && jobConfig.locations.some(l => l.locationName || l.locationTimer);
+  if (hasLocations && jobConfig.locations[lIdx]) {
     timerStr = jobConfig.locations[lIdx].locationTimer;
   }
 
+  // 2. If no location timer, check job types
+  if (!timerStr) {
+    const hasJobTypes = jobConfig.jobTypes && jobConfig.jobTypes.some(jt => jt.jobTypeName || jt.jobTypeTimer);
+    if (hasJobTypes && jobConfig.jobTypes[tIdx]) {
+      timerStr = jobConfig.jobTypes[tIdx].jobTypeTimer;
+    }
+  }
+
+  // 3. If still no timer, check workplace types
+  if (!timerStr) {
+    const hasWorkplaceTypes = jobConfig.workplaceTypes && jobConfig.workplaceTypes.some(wt => wt.workplaceTypeName || wt.workplaceTypeTimer);
+    if (hasWorkplaceTypes && jobConfig.workplaceTypes[wIdx]) {
+      timerStr = jobConfig.workplaceTypes[wIdx].workplaceTypeTimer;
+    }
+  }
+
+  // 4. Finally, fallback to global job config timer
   if (!timerStr) {
     timerStr = jobConfig.jobConfigTimer;
   }
@@ -359,10 +404,25 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
     ? jobConfig.jobTypes
     : [{ jobTypeName: '', jobTypeTimer: '' }];
 
+  const workplaceTypes = (jobConfig.workplaceTypes && jobConfig.workplaceTypes.length > 0)
+    ? jobConfig.workplaceTypes
+    : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
+
   if (state.locationIndex >= locations.length) {
     // Move to next job config
     state.jobIndex++;
     state.locationIndex = 0;
+    state.typeIndex = 0;
+    state.workplaceIndex = 0;
+    saveState(state);
+    processCurrentSegment(state, configs);
+    return;
+  }
+
+  if (state.workplaceIndex >= workplaceTypes.length) {
+    // Move to next location
+    state.locationIndex++;
+    state.workplaceIndex = 0;
     state.typeIndex = 0;
     saveState(state);
     processCurrentSegment(state, configs);
@@ -370,8 +430,8 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
   }
 
   if (state.typeIndex >= jobTypes.length) {
-    // Move to next location
-    state.locationIndex++;
+    // Move to next workplace type
+    state.workplaceIndex++;
     state.typeIndex = 0;
     saveState(state);
     processCurrentSegment(state, configs);
@@ -382,9 +442,10 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
   const targetTitle = jobConfig.jobTitleName;
   const targetLocation = locations[state.locationIndex].locationName; // Can be empty if using default
   const targetType = jobTypes[state.typeIndex].jobTypeName;     // Can be empty
+  const targetWorkplace = workplaceTypes[state.workplaceIndex].workplaceTypeName; // Can be empty
 
   // Construct search URL
-  const targetUrl = constructSearchUrl(targetTitle, targetLocation, targetType);
+  const targetUrl = constructSearchUrl(targetTitle, targetLocation, targetType, targetWorkplace);
 
   // Check if we are already on this URL parameter set
   if (!isCurrentUrlMatching(targetUrl)) {
@@ -419,7 +480,7 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
   runAutoApplyProcess();
 }
 
-function constructSearchUrl(keywords: string, location: string, jobType: string): string {
+function constructSearchUrl(keywords: string, location: string, jobType: string, workplace: string): string {
   const baseUrl = 'https://www.linkedin.com/jobs/search/';
   const params = new URLSearchParams(window.location.search); // Start with current params
 
@@ -439,9 +500,15 @@ function constructSearchUrl(keywords: string, location: string, jobType: string)
   const f_JT = mapJobType(jobType);
   if (f_JT) {
     params.set('f_JT', f_JT);
-  } else {
-    params.delete('f_JT');
   }
+
+  const f_WT = mapWorkplaceType(workplace);
+  if (f_WT) {
+    params.set('f_WT', f_WT);
+  }
+
+  // Always set f_AL=true (Easy Apply)
+  params.set('f_AL', 'true');
 
   // Reset pagination but keep other parameters
   params.set('start', '0');
@@ -481,7 +548,7 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
   }
 
   // Check if essential parameters match
-  const essentialKeys = ['keywords', 'location'];
+  const essentialKeys = ['keywords', 'location', 'f_AL'];
 
   for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
@@ -492,9 +559,22 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
     const c = (currentVal || '').toLowerCase().trim();
 
     if (t !== c) {
-      // Allow slight fuzzy match for location? LinkedIn often auto-formats locations.
-      if (t !== '' && c !== '') return false;
+      return false;
     }
+  }
+
+  // Check workplace type only if specified in config
+  const targetWT = target.searchParams.get('f_WT') || '';
+  const currentWT = currentUrl.searchParams.get('f_WT') || '';
+  if (targetWT !== '' && targetWT !== currentWT) {
+    return false;
+  }
+
+  // Check job type only if specified in config
+  const targetJT = target.searchParams.get('f_JT') || '';
+  const currentJT = currentUrl.searchParams.get('f_JT') || '';
+  if (targetJT !== '' && targetJT !== currentJT) {
+    return false;
   }
 
   return true;
@@ -516,25 +596,35 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
     ? jobConfig.jobTypes
     : [{ jobTypeName: '', jobTypeTimer: '' }];
 
-  // Increment type index first
-  state.typeIndex++;
+  const workplaceTypes = (jobConfig.workplaceTypes && jobConfig.workplaceTypes.length > 0)
+    ? jobConfig.workplaceTypes
+    : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
 
-  // If we've exhausted all types for current location, move to next location
-  if (state.typeIndex >= jobTypes.length) {
-    state.locationIndex++;
-    state.typeIndex = 0;
+  // Increment location index first (Inner loop)
+  state.locationIndex++;
 
-    // If we've exhausted all locations for current job, move to next job
-    if (state.locationIndex >= locations.length) {
-      state.jobIndex++;
-      state.locationIndex = 0;
+  // If we've exhausted all locations, move to next job type
+  if (state.locationIndex >= locations.length) {
+    state.typeIndex++;
+    state.locationIndex = 0;
+
+    // If we've exhausted all job types, move to next workplace type
+    if (state.typeIndex >= jobTypes.length) {
+      state.workplaceIndex++;
+      state.typeIndex = 0;
+
+      // If we've exhausted all workplace types, move to next job config
+      if (state.workplaceIndex >= workplaceTypes.length) {
+        state.jobIndex++;
+        state.workplaceIndex = 0;
+      }
     }
   }
 
   state.startTime = Date.now(); // Reset start time for new segment
 
   // Calculate duration for the next segment
-  state.segmentDuration = calculateSegmentDuration(configs, state.jobIndex, state.locationIndex, state.typeIndex);
+  state.segmentDuration = calculateSegmentDuration(configs, state.jobIndex, state.locationIndex, state.typeIndex, state.workplaceIndex);
 
   // Save and process
   saveState(state);
@@ -554,8 +644,9 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
         state.jobIndex = 0;
         state.locationIndex = 0;
         state.typeIndex = 0;
+        state.workplaceIndex = 0;
         state.startTime = Date.now();
-        state.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0);
+        state.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0, 0);
         saveState(state);
         processCurrentSegment(state, configs);
       } else {
@@ -826,6 +917,33 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
 
 async function runAutoApplyProcess() {
   if (!currentState || !currentState.isRunning || currentState.isPaused) return;
+
+  // Verify URL matching (Strict enforcement of f_AL=true and other mandatory filters)
+  const jobConfig = currentState.configs[currentState.jobIndex];
+  if (jobConfig) {
+    const locations = (jobConfig.locations && jobConfig.locations.length > 0)
+      ? jobConfig.locations
+      : [{ locationName: '', locationTimer: '' }];
+    const jobTypes = (jobConfig.jobTypes && jobConfig.jobTypes.length > 0)
+      ? jobConfig.jobTypes
+      : [{ jobTypeName: '', jobTypeTimer: '' }];
+    const workplaceTypes = (jobConfig.workplaceTypes && jobConfig.workplaceTypes.length > 0)
+      ? jobConfig.workplaceTypes
+      : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
+
+    const targetUrl = constructSearchUrl(
+      jobConfig.jobTitleName,
+      locations[currentState.locationIndex].locationName,
+      jobTypes[currentState.typeIndex].jobTypeName,
+      workplaceTypes[currentState.workplaceIndex].workplaceTypeName
+    );
+
+    if (!isCurrentUrlMatching(targetUrl)) {
+      console.log('URL mismatch detected while running (f_AL=true might be missing). Redirecting...');
+      window.location.href = targetUrl;
+      return;
+    }
+  }
 
   // Check limit
   if (await checkDailyLimit()) {
