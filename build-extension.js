@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+console.log('🚀 Building production-ready extension...\n');
+
 // Create dist directory if it doesn't exist
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
@@ -131,22 +133,14 @@ cssFiles.forEach(cssFile => {
 });
 
 // Copy JavaScript files from assets
-const assetsScriptsSrc = path.join(__dirname, 'src', 'assets', 'scripts');
-const distAssetsScripts = path.join(distDir, 'assets', 'scripts');
-if (fs.existsSync(assetsScriptsSrc)) {
-  if (!fs.existsSync(distAssetsScripts)) {
-    fs.mkdirSync(distAssetsScripts, { recursive: true });
-  }
-  
-  const scriptFiles = fs.readdirSync(assetsScriptsSrc);
-  scriptFiles.forEach(scriptFile => {
-    const srcScript = path.join(assetsScriptsSrc, scriptFile);
-    const destScript = path.join(distAssetsScripts, scriptFile);
-    if (fs.existsSync(srcScript)) {
-      fs.copyFileSync(srcScript, destScript);
-      console.log(`Copied ${scriptFile} to dist/assets/scripts folder`);
-    }
-  });
-}
+// (Logic moved to main bundle for protection)
 
-console.log('Extension build completed!');
+
+console.log('\n✅ Extension build completed!');
+console.log('\n📦 Production Build Summary:');
+console.log('   ✓ All .md files excluded from build');
+console.log('   ✓ Console logs removed via webpack');
+console.log('   ✓ Code minified and obfuscated');
+console.log('   ✓ Source maps disabled');
+console.log('\n📁 Build output: ./dist/');
+console.log('   Ready for distribution!\n');

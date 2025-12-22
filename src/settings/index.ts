@@ -26,17 +26,13 @@ let currentRoot: any = null;
 // Function to render the appropriate component based on the active tab
 function renderComponent(componentName: string) {
   const container = document.getElementById('settings-container');
-  console.log('Rendering component:', componentName);
-  console.log('Container element:', container);
 
   if (!container) {
-    console.error('Settings container not found');
     return;
   }
 
   // Unmount the previous root if it exists BEFORE clearing the container
   if (currentRoot) {
-    console.log('Unmounting previous root');
     currentRoot.unmount();
   }
 
@@ -45,7 +41,6 @@ function renderComponent(componentName: string) {
 
   // Create a new root and render the component
   currentRoot = createRoot(container);
-  console.log('Created new root:', currentRoot);
 
   let componentElement: React.ReactElement | null = null;
 
@@ -106,16 +101,12 @@ function renderComponent(componentName: string) {
       break;
 
     default:
-      console.log('Rendering default TokenSettings component');
       componentElement = React.createElement(TokenSettings, {});
   }
 
   // Render the component
   if (componentElement) {
     currentRoot.render(componentElement);
-    console.log('Component rendered successfully');
-  } else {
-    console.error('Failed to create component element');
   }
 }
 
@@ -261,15 +252,59 @@ async function checkTokenOnLoad() {
 document.addEventListener('DOMContentLoaded', () => {
   initModeToggles();
   updateApiStatusBadge();
-  checkTokenOnLoad(); // Check token validity when page loads
+  checkTokenOnLoad();
+
+  // Handle tab switching functionality
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+
+      // Check if the clicked element is a button with data-tab attribute
+      if (target.tagName === 'BUTTON' && target.hasAttribute('data-tab')) {
+        e.preventDefault();
+
+        const tab = target.getAttribute('data-tab') || 'settings';
+
+        // Update active tab
+        document.querySelectorAll('.sidebar button').forEach(button => {
+          button.classList.remove('active');
+        });
+        target.classList.add('active');
+
+        renderComponent(tab);
+      }
+    });
+  }
+
+  // Define global accordion initializer for React components
+  (window as any).initSearchTimerAccordions = () => {
+    const accordionHeaders = document.querySelectorAll('.search-timer-config .accordion h3');
+
+    accordionHeaders.forEach(header => {
+      // Remove any existing event listeners to prevent duplicates
+      const clone = header.cloneNode(true);
+      header.parentNode?.replaceChild(clone, header);
+
+      // Add click event listener
+      clone.addEventListener('click', function (this: HTMLElement) {
+        const accordion = this.parentElement;
+        const panel = this.nextElementSibling;
+
+        // Toggle active class on accordion
+        if (accordion) accordion.classList.toggle('active');
+
+        // Toggle open class on panel
+        if (panel) panel.classList.toggle('open');
+      });
+    });
+  };
 
   // Render the default component
   renderComponent('settings');
 
   // Render help button
   renderSettingsHelpButton();
-
-  console.log('Settings page initialized');
 
   // Check if settings demo should be shown
   checkSettingsDemo();
