@@ -449,8 +449,13 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
 
   // Check if we are already on this URL parameter set
   if (!isCurrentUrlMatching(targetUrl)) {
-    console.log('Redirecting to match config:', { targetTitle, targetLocation, targetType });
-    window.location.href = targetUrl;
+    if (window.location.pathname.includes('/jobs/view/')) {
+      console.log('On job view page, going back to search');
+      window.history.back();
+    } else {
+      console.log('Redirecting to match config:', { targetTitle, targetLocation, targetType });
+      window.location.href = targetUrl;
+    }
     return;
   }
 

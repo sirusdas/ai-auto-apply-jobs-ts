@@ -1,134 +1,43 @@
 [{
         "jobConfigTimer": "",
         "jobTitleName": "Research Engineer",
-        "jobTypes": [
-            "Research"
-        ],
-        "locations": [{
+        "jobTypes": [],
+        "locations": [
+            {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Senior Research Engineer",
-        "jobTypes": [
-            "Research"
-        ],
-        "locations": [{
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Research Scientist",
-        "jobTypes": [
-            "Research"
-        ],
-        "locations": [{
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
@@ -141,88 +50,86 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
     },
     {
         "jobConfigTimer": "",
-        "jobTitleName": "Senior Software Engineer",
+        "jobTitleName": "Research Scientist",
         "jobTypes": [],
-        "locations": [
-
-            {
+        "locations": [{
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
-    },
+    }, 
     {
         "jobConfigTimer": "",
         "jobTitleName": "Full Stack Developer",
@@ -233,86 +140,39 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Full Stack Software Engineer",
-        "jobTypes": [
-
-        ],
-        "locations": [
-
-            {
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
@@ -327,86 +187,39 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Backend Engineer",
-        "jobTypes": [
-
-        ],
-        "locations": [
-
-            {
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
@@ -421,86 +234,39 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Frontend Engineer",
-        "jobTypes": [
-
-        ],
-        "locations": [
-
-            {
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
@@ -515,145 +281,39 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Software Developer",
-        "jobTypes": [
-
-        ],
-        "locations": [
-
-            {
-                "locationName": "Worldwide",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Asia Pacific",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Europe",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
-            }
-        ],
-        "sequence": ""
-    },
-    {
-        "jobConfigTimer": "",
-        "jobTitleName": "Lead Software Engineer",
-        "jobTypes": [
-
-        ],
-        "locations": [
-
-            {
-                "locationName": "United States",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Canada",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "India",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Germany",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Australia",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-            },
-            {
-                "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
             }
         ],
         "sequence": ""
@@ -668,39 +328,86 @@
 
             {
                 "locationName": "United States",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Canada",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "United Kingdom",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "India",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Germany",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Netherlands",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Australia",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Singapore",
-                "locationTimer": "7"
+                "locationTimer": "15"
             },
             {
                 "locationName": "Ireland",
-                "locationTimer": "7"
+                "locationTimer": "15"
+            }
+        ],
+        "sequence": ""
+    },
+    {
+        "jobConfigTimer": "",
+        "jobTitleName": "Tech Lead",
+        "jobTypes": [
+
+        ],
+        "locations": [
+
+            {
+                "locationName": "United States",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Canada",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "United Kingdom",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "India",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Germany",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Netherlands",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Australia",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Singapore",
+                "locationTimer": "15"
+            },
+            {
+                "locationName": "Ireland",
+                "locationTimer": "15"
             }
         ],
         "sequence": ""

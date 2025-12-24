@@ -138,7 +138,7 @@ export const SIDEBAR_DEMO: DemoFlow = {
       description: 'Configure job titles, locations, and types you want to target.',
       targetSelector: '[data-demo="job-config-section"]',
       position: 'right',
-      videoUrl: 'https://youtube.com/watch?v=example1'
+      videoUrl: ''
     },
     // ... more steps
   ]
@@ -155,7 +155,7 @@ export const SETTINGS_DEMO: DemoFlow = {
       description: 'Configure your AI provider tokens here. You can use multiple providers!',
       targetSelector: '[data-demo="api-settings-tab"]',
       position: 'bottom',
-      videoUrl: 'https://youtube.com/watch?v=api-setup'
+       videoUrl: ''
     },
     {
       id: 'resume-management',
@@ -175,7 +175,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
     description: 'Choose which AI provider to use for generating responses.',
     usage: 'Select from available providers like OpenAI, Anthropic, or Google Gemini. Each has different strengths.',
     bestPractices: 'Use multiple providers for fallback. OpenAI is great for general responses, Claude for detailed analysis.',
-    videoUrl: 'https://youtube.com/watch?v=ai-providers',
+     videoUrl: '',
     relatedOptions: ['api-tokens', 'model-selection']
   },
   'company-filter': {
@@ -183,7 +183,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
     title: 'Company Type Filter',
     description: 'Filter jobs by company type (Product vs Service companies).',
     usage: 'Enable this to focus only on product companies or service companies based on your preference.',
-    videoUrl: 'https://youtube.com/watch?v=company-filter'
+     videoUrl: ''
   },
   // ... more options
 };

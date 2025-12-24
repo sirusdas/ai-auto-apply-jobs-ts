@@ -65,7 +65,7 @@ export const SETTINGS_DEMO: DemoFlow = {
             description: 'Configure your primary AI provider tokens here. You can see the validity status via the green/red dot.',
             targetSelector: '[data-demo="api-settings-tab"]',
             position: 'right',
-            videoUrl: 'https://youtube.com/watch?v=api-setup'
+             videoUrl: ''
         },
         {
             id: 'ai-providers',
@@ -133,7 +133,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Enter your API token to enable job matching and resume analysis.',
         usage: 'Get a token from qerds.com, paste it here, and click "Save & Validate".',
         bestPractices: 'Keep your token secure. Each token has an expiry date and a usage limit.',
-        videoUrl: 'https://youtube.com/watch?v=token-setup'
+         videoUrl: ''
     },
     'ai-provider-selection': {
         optionId: 'ai-provider-selection',
@@ -141,7 +141,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Choose which AI provider (Gemini, Claude, OpenAI) to use for generating responses.',
         usage: 'Enable the providers you want to use and set their priority. The extension will automatically fallback if one fails.',
         bestPractices: 'Use Gemini for cost-effectiveness and OpenAI/Claude for high-quality complex forms.',
-        videoUrl: 'https://youtube.com/watch?v=ai-providers',
+         videoUrl: '',
         relatedOptions: ['api-tokens', 'model-selection']
     },
     'personal-info': {
@@ -149,8 +149,8 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         title: 'Personal Information',
         description: 'Store your personal details that will be used to fill application forms.',
         usage: 'Enter your name, contact info, and basic details. These are used as fallbacks when AI cannot determine a value.',
-        bestPractices: 'Ensure your phone number is in international format (+XX XXXXXXXXXX).',
-        videoUrl: 'https://youtube.com/watch?v=personal-info'
+        bestPractices: '',
+         videoUrl: ''
     },
     'resume-management': {
         optionId: 'resume-management',
@@ -158,7 +158,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Upload and manage your resumes for AI-driven applications.',
         usage: 'Paste your full resume text or generate a compressed YAML profile. The AI uses this for job matching and form filling.',
         bestPractices: 'The Compressed YAML format is highly recommended for faster AI processing.',
-        videoUrl: 'https://youtube.com/watch?v=resume-guide'
+         videoUrl: ''
     },
     'job-match': {
         optionId: 'job-match',
@@ -166,14 +166,14 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Configure how the AI should filter jobs based on your profile.',
         usage: 'Set a minimum match score (1-5). Jobs below this score will be skipped automatically.',
         bestPractices: 'A score of 3 is usually a good balance between quality and volume.',
-        videoUrl: 'https://youtube.com/watch?v=job-matching'
+         videoUrl: ''
     },
     'company-filter': {
         optionId: 'company-filter',
         title: 'Company Type Filter',
         description: 'Filter jobs by company type (Product vs Service companies).',
         usage: 'Enable or disable application to specific company types. This helps focus your search.',
-        videoUrl: 'https://youtube.com/watch?v=company-filter'
+         videoUrl: ''
     },
     'delays': {
         optionId: 'delays',
@@ -181,14 +181,14 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Configure human-like delays between automation steps.',
         usage: 'Set very short, short, and long delays in milliseconds. Random variation is added automatically.',
         bestPractices: 'Setting delays too short might trigger anti-bot measures. Default values are recommended.',
-        videoUrl: 'https://youtube.com/watch?v=delays-guide'
+         videoUrl: ''
     },
     'applied-jobs': {
         optionId: 'applied-jobs',
         title: 'Applied Jobs History',
         description: 'Track and analyze your job application history.',
         usage: 'View a list of all jobs applied. Pro users get advanced analytics and charts.',
-        videoUrl: 'https://youtube.com/watch?v=app-history'
+         videoUrl: ''
     },
     'search-timer': {
         optionId: 'search-timer',
@@ -196,7 +196,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
         description: 'Automate multiple job title searches with specific time limits. Elements are processed in a hierarchy: Workplace Type > Job Type > Locations.',
         usage: 'Configure your target keywords and locations. If locations are present, Workplace and Job Type timers are automatically calculated as the sum of their children (locations). The extension iterates through each Workplace, then each Job Type, and finally each Location.',
         bestPractices: 'Use the "Run in Loop" option for 24/7 background application. Example: Searching Onsite + Remote for Full-time in London and Manchester will create 4 search segments (Onsite Full-time London, Onsite Full-time Manchester, etc.).',
-        videoUrl: 'https://youtube.com/watch?v=automation-guide'
+         videoUrl: ''
     },
     'gemini-help': {
         optionId: 'gemini-help',
