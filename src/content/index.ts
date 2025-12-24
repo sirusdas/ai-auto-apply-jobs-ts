@@ -546,6 +546,8 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
   // More flexible check: do essential path and query params match?
   const currentUrl = new URL(window.location.href);
   const target = new URL(targetUrl);
+  console.log('Current URL:', currentUrl.pathname);
+  console.log('Target URL:', target.pathname);
 
   // Check if we're on the same base path
   if (currentUrl.pathname !== target.pathname) {
@@ -558,29 +560,34 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
   for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
     const currentVal = currentUrl.searchParams.get(key);
+    console.log(`Comparing param "${key}": target="${targetVal}", current="${currentVal}"`);
 
     // Normalize null/empty
     const t = (targetVal || '').toLowerCase().trim();
     const c = (currentVal || '').toLowerCase().trim();
 
     if (t !== c) {
+      if(key === 'location'){
+        return true;
+      }
+      
       return false;
     }
   }
 
   // Check workplace type only if specified in config
-  const targetWT = target.searchParams.get('f_WT') || '';
-  const currentWT = currentUrl.searchParams.get('f_WT') || '';
-  if (targetWT !== '' && targetWT !== currentWT) {
-    return false;
-  }
+  // const targetWT = target.searchParams.get('f_WT') || '';
+  // const currentWT = currentUrl.searchParams.get('f_WT') || '';
+  // if (targetWT !== '' && targetWT !== currentWT) {
+  //   return false;
+  // }
 
   // Check job type only if specified in config
-  const targetJT = target.searchParams.get('f_JT') || '';
-  const currentJT = currentUrl.searchParams.get('f_JT') || '';
-  if (targetJT !== '' && targetJT !== currentJT) {
-    return false;
-  }
+  // const targetJT = target.searchParams.get('f_JT') || '';
+  // const currentJT = currentUrl.searchParams.get('f_JT') || '';
+  // if (targetJT !== '' && targetJT !== currentJT) {
+  //   return false;
+  // }
 
   return true;
 }
