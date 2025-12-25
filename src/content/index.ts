@@ -13,6 +13,7 @@ import { FIRST_INSTALL_DEMO, SIDEBAR_DEMO } from '../constants/demoSteps';
 // Constants
 const API_TOKEN_KEY = 'apiToken';
 const STATE_KEY = 'jobApplicationState';
+const RELOAD_KEY = 'autoApplyReloadTimes';
 
 // Interfaces
 interface JobConfig {
@@ -124,6 +125,49 @@ function clearState() {
 // --- Main Initialization ---
 
 function initExtensionUI(): void {
+  const isProgrammaticReload = sessionStorage.getItem(RELOAD_KEY + '_flag') === 'true';
+
+  if (isProgrammaticReload) {
+    sessionStorage.removeItem(RELOAD_KEY + '_flag'); // Consume flag
+
+    const MAX_RELOADS = 3;
+    const RELOAD_WINDOW_MS = 60000; // 60 seconds
+
+    try {
+      const now = Date.now();
+      const reloadTimes: number[] = JSON.parse(sessionStorage.getItem(RELOAD_KEY) || '[]');
+      
+      // Filter out old timestamps
+      const recentReloads = reloadTimes.filter(time => now - time < RELOAD_WINDOW_MS);
+      console.log(`Total reloads: ${reloadTimes.length}`);
+      // Add current load time
+      recentReloads.push(now);
+      console.log(`Recent reload times: ${recentReloads.length}`);
+
+      sessionStorage.setItem(RELOAD_KEY, JSON.stringify(recentReloads));
+
+      if (recentReloads.length > MAX_RELOADS) {
+        console.error(`Extension reloaded ${recentReloads.length} times in a row. Stopping to prevent infinite loop.`);
+        alert(`AI Auto-Apply has been stopped because it was reloading the page too frequently. This can happen if LinkedIn's page structure has changed or there's a configuration issue.`);
+        
+        // Stop the process and clear the reload history
+        stopAutoApplyProcess();
+        sessionStorage.removeItem(RELOAD_KEY);
+        // reload the page
+        window.location.reload();
+        // Don't continue with initialization
+        return;
+      }
+    } catch (e) {
+        console.error('Error in reload detection logic:', e);
+        sessionStorage.removeItem(RELOAD_KEY);
+    }
+  } else {
+    // If it's a manual reload or first load, clear the counter
+    // console.log('Manual reload detected');
+    // sessionStorage.removeItem(RELOAD_KEY);
+  }
+
   // Check if we have an active state to resume
   loadState().then(state => {
     currentState = state;
@@ -449,6 +493,8 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
 
   // Check if we are already on this URL parameter set
   if (!isCurrentUrlMatching(targetUrl)) {
+    sessionStorage.setItem(RELOAD_KEY + '_flag', 'true'); // Set flag for programmatic reload
+
     if (window.location.pathname.includes('/jobs/view/')) {
       console.log('On job view page, going back to search');
       window.history.back();
@@ -458,6 +504,7 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
     }
     return;
   }
+  
 
   // We are on the correct page. Start Logic.
   showLoadingState();
@@ -567,10 +614,6 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
     const c = (currentVal || '').toLowerCase().trim();
 
     if (t !== c) {
-      if(key === 'location'){
-        return true;
-      }
-      
       return false;
     }
   }
@@ -597,6 +640,9 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
   // 1. Next job type within current location
   // 2. Next location within current job config
   // 3. Next job config
+console.log('Moving to next segment...');
+  // We are on the correct page, so clear any reload loop detection.
+  sessionStorage.removeItem(RELOAD_KEY);
 
   // Get current job config to access locations and job types
   const jobConfig = configs[state.jobIndex];
