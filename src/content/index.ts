@@ -136,7 +136,7 @@ function initExtensionUI(): void {
     try {
       const now = Date.now();
       const reloadTimes: number[] = JSON.parse(sessionStorage.getItem(RELOAD_KEY) || '[]');
-      
+
       // Filter out old timestamps
       const recentReloads = reloadTimes.filter(time => now - time < RELOAD_WINDOW_MS);
       console.log(`Total reloads: ${reloadTimes.length}`);
@@ -149,7 +149,7 @@ function initExtensionUI(): void {
       if (recentReloads.length > MAX_RELOADS) {
         console.error(`Extension reloaded ${recentReloads.length} times in a row. Stopping to prevent infinite loop.`);
         alert(`AI Auto-Apply has been stopped because it was reloading the page too frequently. This can happen if LinkedIn's page structure has changed or there's a configuration issue.`);
-        
+
         // Stop the process and clear the reload history
         stopAutoApplyProcess();
         sessionStorage.removeItem(RELOAD_KEY);
@@ -159,8 +159,8 @@ function initExtensionUI(): void {
         return;
       }
     } catch (e) {
-        console.error('Error in reload detection logic:', e);
-        sessionStorage.removeItem(RELOAD_KEY);
+      console.error('Error in reload detection logic:', e);
+      sessionStorage.removeItem(RELOAD_KEY);
     }
   } else {
     // If it's a manual reload or first load, clear the counter
@@ -181,6 +181,8 @@ function initExtensionUI(): void {
 
       // If we are running and not paused, resume logic
       if (state && state.isRunning) {
+        // Only fix parameters if we are currently running the auto-apply
+        ensureUrlParametersCorrect();
         resumeAutoApplyProcess(state);
       }
     }
@@ -504,7 +506,7 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
     }
     return;
   }
-  
+
 
   // We are on the correct page. Start Logic.
   showLoadingState();
@@ -530,6 +532,43 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
 
   // Start the actual applying loop
   runAutoApplyProcess();
+}
+
+// Function to check if current URL has correct parameters and fix if needed
+function ensureUrlParametersCorrect() {
+  const currentUrl = new URL(window.location.href);
+
+  // Only apply to job search pages
+  if (!currentUrl.pathname.includes('/jobs/search')) {
+    return;
+  }
+
+  let needsRedirect = false;
+  let needsHistoryUpdate = false;
+
+  // Check if sortBy is not R (case-insensitive)
+  const currentSortBy = currentUrl.searchParams.get('sortBy');
+  if (!currentSortBy || currentSortBy.toUpperCase() !== 'R') {
+    currentUrl.searchParams.set('sortBy', 'R');
+    needsRedirect = true;
+  }
+
+  // Check if refresh=true exists
+  if (currentUrl.searchParams.get('refresh') === 'true') {
+    currentUrl.searchParams.delete('refresh');
+    if (!needsRedirect) needsHistoryUpdate = true;
+  }
+
+  // Update the URL if corrections are needed
+  if (needsRedirect) {
+    const newUrl = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}${currentUrl.hash}`;
+    console.log(`Redirecting to correct sort order: ${window.location.href} -> ${newUrl}`);
+    window.location.replace(newUrl);
+  } else if (needsHistoryUpdate) {
+    const newUrl = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}${currentUrl.hash}`;
+    console.log(`Cleaning up URL parameters: ${window.location.href} -> ${newUrl}`);
+    window.history.replaceState({}, document.title, newUrl);
+  }
 }
 
 function constructSearchUrl(keywords: string, location: string, jobType: string, workplace: string): string {
@@ -562,6 +601,14 @@ function constructSearchUrl(keywords: string, location: string, jobType: string,
   // Always set f_AL=true (Easy Apply)
   params.set('f_AL', 'true');
 
+  // Ensure sortBy=R regardless of current value
+  params.set('sortBy', 'R');
+
+  // Remove refresh=true if it exists
+  if (params.get('refresh') === 'true') {
+    params.delete('refresh');
+  }
+
   // Reset pagination but keep other parameters
   params.set('start', '0');
 
@@ -574,7 +621,6 @@ function constructSearchUrl(keywords: string, location: string, jobType: string,
 
 function preserveCustomSearchParams(targetUrl: string): string {
   // Preserve ALL search parameters from current URL when constructing target URL
-  // This ensures we keep all user's custom search filters
   const currentUrl = new URL(window.location.href);
   const target = new URL(targetUrl);
 
@@ -584,6 +630,15 @@ function preserveCustomSearchParams(targetUrl: string): string {
     if (!target.searchParams.has(key)) {
       target.searchParams.set(key, value);
     }
+  }
+
+  // Ensure correct URL parameters regardless of what was copied
+  // Always ensure sortBy=R regardless of current value
+  target.searchParams.set('sortBy', 'R');
+
+  // Remove refresh=true if it exists
+  if (target.searchParams.get('refresh') === 'true') {
+    target.searchParams.delete('refresh');
   }
 
   return target.toString();
@@ -602,7 +657,7 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
   }
 
   // Check if essential parameters match
-  const essentialKeys = ['keywords', 'location', 'f_AL'];
+  const essentialKeys = ['keywords', 'location', 'f_AL', 'sortBy'];
 
   for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
@@ -640,7 +695,7 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
   // 1. Next job type within current location
   // 2. Next location within current job config
   // 3. Next job config
-console.log('Moving to next segment...');
+  console.log('Moving to next segment...');
   // We are on the correct page, so clear any reload loop detection.
   sessionStorage.removeItem(RELOAD_KEY);
 
