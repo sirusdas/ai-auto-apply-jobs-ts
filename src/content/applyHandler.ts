@@ -369,7 +369,7 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                 type: 'basic',
                 title: 'API Token Required',
                 message: 'Please update your API token to continue using AI features.',
-                iconUrl: '128128.png'
+                iconUrl: 'laaa_logo_128x128.png'
             }
         });
         

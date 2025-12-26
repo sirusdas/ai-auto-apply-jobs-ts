@@ -36,7 +36,7 @@ if (fs.existsSync(settingsCssSrc)) {
 }
 
 // Copy icons to dist
-const icons = ['1616.png', '4848.png', '128128.png'];
+const icons = ['laaa_logo_16x16.png', 'laaa_logo_48x48.png', 'laaa_logo_128x128.png'];
 icons.forEach(icon => {
   const srcIcon = path.join(__dirname, icon);
   const destIcon = path.join(distDir, icon);

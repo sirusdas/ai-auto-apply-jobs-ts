@@ -87,7 +87,7 @@ async function checkTokenValidityOnStartup() {
     // Token is missing or invalid, show notification and offer to go to settings
     chrome.notifications.create('token-invalid', {
       type: 'basic',
-      iconUrl: '128128.png',
+      iconUrl: 'laaa_logo_128x128.png',
       title: 'API Token Required',
       message: 'Please update your API token to continue using AI features.',
       priority: 2,
@@ -115,7 +115,7 @@ async function checkTokenExpiry() {
   if (diffDays <= 0) {
     chrome.notifications.create('token-expired', {
       type: 'basic',
-      iconUrl: '128128.png',
+      iconUrl: 'laaa_logo_128x128.png',
       title: 'API Token Expired',
       message: 'Your API token has expired. Please renew it to continue using AI features.',
       priority: 2,
@@ -131,7 +131,7 @@ async function checkTokenExpiry() {
   } else if (diffDays <= 7) {
     chrome.notifications.create('token-expiring', {
       type: 'basic',
-      iconUrl: '128128.png',
+      iconUrl: 'laaa_logo_128x128.png',
       title: 'API Token Expiring Soon',
       message: `Your API token will expire in ${diffDays} days. Please renew it soon.`,
       priority: 1,
@@ -157,7 +157,7 @@ async function stopExtension(reason: string) {
   // Notify the user
   chrome.notifications.create('extension-stopped', {
     type: 'basic',
-    iconUrl: '128128.png',
+    iconUrl: 'laaa_logo_128x128.png',
     title: 'Extension Stopped',
     message: reason,
     priority: 2

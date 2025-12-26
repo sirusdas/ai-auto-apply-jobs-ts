@@ -4,9 +4,9 @@
   "version": "2.0.0",
   "description": "Automate & autofill job applications with AI",
   "icons": {
-    "16": "1616.png",
-    "48": "4848.png",
-    "128": "128128.png"
+    "16": "laaa_logo_16x16.png",
+    "48": "laaa_logo_48x48.png",
+    "128": "laaa_logo_128x128.png"
   },
   "permissions": [
     "storage",
@@ -27,9 +27,9 @@
   "action": {
     "default_title": "Auto Apply Settings",
     "default_icon": {
-      "16": "1616.png",
-      "48": "4848.png",
-      "128": "128128.png"
+      "16": "laaa_logo_16x16.png",
+      "48": "laaa_logo_48x48.png",
+      "128": "laaa_logo_128x128.png"
     }
   },
   "content_scripts": [
