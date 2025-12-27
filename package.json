@@ -1,6 +1,6 @@
 {
   "name": "linkedin-jobs-ai-auto-apply",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "Automate & autofill job applications with AI",
   "main": "index.js",
   "scripts": {

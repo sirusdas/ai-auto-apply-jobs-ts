@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LinkedIn Jobs AI Auto Apply",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Automate & autofill job applications with AI",
   "icons": {
     "16": "laaa_logo_16x16.png",
