@@ -155,7 +155,7 @@ export const SETTINGS_DEMO: DemoFlow = {
       description: 'Configure your AI provider tokens here. You can use multiple providers!',
       targetSelector: '[data-demo="api-settings-tab"]',
       position: 'bottom',
-       videoUrl: ''
+       videoUrl: 'https://www.youtube.com/watch?v=FGVe1EXcciE&t=32s'
     },
     {
       id: 'resume-management',
@@ -175,7 +175,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
     description: 'Choose which AI provider to use for generating responses.',
     usage: 'Select from available providers like OpenAI, Anthropic, or Google Gemini. Each has different strengths.',
     bestPractices: 'Use multiple providers for fallback. OpenAI is great for general responses, Claude for detailed analysis.',
-     videoUrl: '',
+     videoUrl: 'https://www.youtube.com/watch?v=FGVe1EXcciE&t=1m22s',
     relatedOptions: ['api-tokens', 'model-selection']
   },
   'company-filter': {
@@ -183,7 +183,7 @@ export const OPTION_INFO_MAP: Record<string, OptionInfo> = {
     title: 'Company Type Filter',
     description: 'Filter jobs by company type (Product vs Service companies).',
     usage: 'Enable this to focus only on product companies or service companies based on your preference.',
-     videoUrl: ''
+     videoUrl: 'https://www.youtube.com/watch?v=FGVe1EXcciE&t=3m19s'
   },
   // ... more options
 };
