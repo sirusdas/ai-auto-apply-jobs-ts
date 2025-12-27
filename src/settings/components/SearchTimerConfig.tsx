@@ -35,63 +35,28 @@ const SearchTimerConfig: React.FC = () => {
       if (result.jobConfigs) {
         setJobConfigs(restoreIds(result.jobConfigs));
       } else {
-        // Initialize with default job config
-        const defaultConfig = [
-          {
-            "jobConfigTimer": "63",
-            "jobTitleName": "Research Engineer",
-            "jobTypes": [],
-            "locations": [
-              {
-                "locationName": "United Arab Emirates",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "United States",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Canada",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "United Kingdom",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "India",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Germany",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Netherlands",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Australia",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Singapore",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Ireland",
-                "locationTimer": "7"
-              },
-              {
-                "locationName": "Poland",
-                "locationTimer": "7"
-              }
-            ],
-            "sequence": "",
-            "workplaceTypes": []
-          }
-        ];
-        setJobConfigs(restoreIds(defaultConfig));
+        // Initialize with one empty job config
+        setJobConfigs([{
+          id: `job-${Date.now()}`,
+          jobTitleName: '',
+          jobConfigTimer: '0',
+          sequence: '',
+          locations: [{
+            id: `loc-${Date.now()}`,
+            locationName: '',
+            locationTimer: '0'
+          }],
+          jobTypes: [{
+            id: `type-${Date.now()}`,
+            jobTypeName: '',
+            jobTypeTimer: '0'
+          }],
+          workplaceTypes: [{
+            id: `wplace-${Date.now()}`,
+            workplaceTypeName: '',
+            workplaceTypeTimer: '0'
+          }]
+        }]);
       }
 
       if (result.runInLoop !== undefined) {
