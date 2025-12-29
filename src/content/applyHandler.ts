@@ -369,7 +369,7 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                 iconUrl: 'laaa_logo_128x128.png'
             }
         });
-        
+
         // Open settings page
         chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#ai-providers') });
         return null;
@@ -389,7 +389,7 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                 iconUrl: 'laaa_logo_128x128.png'
             }
         });
-        
+
         // Open settings page
         chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#ai-providers') });
         return null;
@@ -675,47 +675,6 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
         console.log('RealRun: Current form state:');
         logFormState(currentModal);
 
-        // Capture form elements for saving
-        const formElements = getFormElements(currentModal);
-
-        // Add inputs to form data
-        formElements.inputs.forEach((input: any) => {
-            formData.inputs.push({
-                type: input.type,
-                name: input.name,
-                value: input.value,
-                placeholder: input.placeholder,
-                label: input.label
-            });
-        });
-
-        // Add radios to form data
-        formElements.radioGroups.forEach((radioGroup: any) => {
-            formData.radios.push({
-                name: radioGroup.name,
-                selectedValue: radioGroup.selectedValue,
-                options: radioGroup.options
-            });
-        });
-
-        // Add dropdowns to form data
-        formElements.selects.forEach((select: any) => {
-            formData.dropdowns.push({
-                name: select.name,
-                selectedValue: select.value,
-                options: select.options,
-                label: select.label
-            });
-        });
-
-        // Add checkboxes to form data
-        formElements.checkboxes.forEach((checkbox: any) => {
-            formData.checkboxes.push({
-                name: checkbox.name,
-                checked: checkbox.checked
-            });
-        });
-
         // Fill Data using Answers
         console.log('RealRun: Filling input fields...');
         await performInputFieldChecks(answers.inputs);
@@ -725,6 +684,10 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
         await performDropdownChecks(answers.dropdowns);
         console.log('RealRun: Filling checkboxes...');
         await performCheckboxChecks(answers.checkboxes);
+
+        // Capture form elements AFTER filling for saving accurately
+        console.log('RealRun: Capturing filled form data...');
+        capturePageFormData(currentModal, formData);
 
         // Set form data to be saved with job
         setApplicationFormData(formData);
@@ -761,7 +724,11 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
 
                 const retryAttempted = await handleValidationRetry(answers, jobDetails);
                 if (retryAttempted) {
-                    console.log('AI Retry: Re-filled fields. Clicking Submit again...');
+                    console.log('AI Retry: Re-filled fields. Capturing updated data...');
+                    capturePageFormData(currentModal, formData);
+                    setApplicationFormData(formData);
+
+                    console.log('AI Retry: Clicking Submit again...');
                     await addShortDelay();
                     submitBtn.click();
                     await addDelay();
@@ -835,7 +802,11 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
 
                 const retryAttempted = await handleValidationRetry(answers, jobDetails);
                 if (retryAttempted) {
-                    console.log('AI Retry: Re-filled fields. Clicking Next/Review again...');
+                    console.log('AI Retry: Re-filled fields. Capturing updated data...');
+                    capturePageFormData(currentModal, formData);
+                    setApplicationFormData(formData);
+
+                    console.log('AI Retry: Clicking Next/Review again...');
                     await addShortDelay();
                     nextBtn.click();
                     await addShortDelay();
@@ -1104,6 +1075,61 @@ function getFormElements(modal: HTMLElement) {
 
     return formElements;
 }
+
+/**
+ * Captures form elements from the current modal and updates the formData object.
+ * This avoids duplicate entries by updating existing fields with new values.
+ */
+function capturePageFormData(modal: HTMLElement, formData: any) {
+    const formElements = getFormElements(modal);
+
+    // Update or add inputs
+    formElements.inputs.forEach((newInput: any) => {
+        const index = formData.inputs.findIndex((i: any) =>
+            (i.name && i.name === newInput.name) ||
+            (i.label && i.label === newInput.label)
+        );
+        if (index >= 0) {
+            formData.inputs[index] = newInput;
+        } else {
+            formData.inputs.push(newInput);
+        }
+    });
+
+    // Update or add radio groups
+    formElements.radioGroups.forEach((newRadio: any) => {
+        const index = formData.radios.findIndex((r: any) => r.name === newRadio.name);
+        if (index >= 0) {
+            formData.radios[index] = newRadio;
+        } else {
+            formData.radios.push(newRadio);
+        }
+    });
+
+    // Update or add dropdowns
+    formElements.selects.forEach((newSelect: any) => {
+        const index = formData.dropdowns.findIndex((s: any) =>
+            (s.name && s.name === newSelect.name) ||
+            (s.label && s.label === newSelect.label)
+        );
+        if (index >= 0) {
+            formData.dropdowns[index] = newSelect;
+        } else {
+            formData.dropdowns.push(newSelect);
+        }
+    });
+
+    // Update or add checkboxes
+    formElements.checkboxes.forEach((newCheckbox: any) => {
+        const index = formData.checkboxes.findIndex((c: any) => c.name === newCheckbox.name);
+        if (index >= 0) {
+            formData.checkboxes[index] = newCheckbox;
+        } else {
+            formData.checkboxes.push(newCheckbox);
+        }
+    });
+}
+
 
 /**
  * Scans the current modal for validation errors and gathers the corresponding questions.
