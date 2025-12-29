@@ -1,4 +1,4 @@
-import { TokenData, ValidationResult, ErrorInfo } from '../types';
+import { TokenData, ValidationResult, ErrorInfo, AISettings } from '../types';
 
 export const API_TOKEN_KEY = 'apiToken';
 export const TOKEN_VALIDATION_TIMESTAMP_KEY = 'tokenValidationTimestamp';
@@ -127,6 +127,27 @@ export async function getToken(): Promise<string | null> {
             const decrypted = await decryptToken(encryptedToken);
             resolve(decrypted);
         });
+    });
+}
+
+/**
+ * Gets the API key for a specific provider from AI settings
+ */
+export async function getApiKeyForProvider(providerId: string): Promise<string | null> {
+    return new Promise(async (resolve) => {
+        const result = await chrome.storage.local.get(['aiSettings']);
+        const aiSettings: AISettings = result.aiSettings;
+        
+        if (aiSettings && aiSettings.providers) {
+            const provider = aiSettings.providers.find(p => p.id === providerId);
+            if (provider && provider.apiKey) {
+                resolve(provider.apiKey);
+            } else {
+                resolve(null);
+            }
+        } else {
+            resolve(null);
+        }
     });
 }
 

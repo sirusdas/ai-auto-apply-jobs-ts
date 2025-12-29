@@ -181,9 +181,9 @@ initAIService();
 initTokenManagement();
 
 // Listen for messages from other parts of the extension
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
   if (request.action === 'fetchToken') {
-    const token = request.token;
+    const token = request.token as string;
     console.log('Received token:', token);
     tokenService.performTokenValidation(token)
       .then((response) => {
@@ -222,88 +222,127 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'checkJobMatch') {
-    const { jobDetails, resume } = request;
+    const { jobDetails, resume } = request as { jobDetails: any; resume: string };
     console.log('Received checkJobMatch request for:', jobDetails.jobTitle);
 
-    ensureTokenValid()
-      .then(isValid => {
-        if (!isValid) {
-          sendResponse({ success: false, error: 'API token expired or invalid' });
-          return;
-        }
-        handleJobMatch(jobDetails, resume)
-          .then((data) => {
-            sendResponse({ success: true, data });
-          })
-          .catch((error) => {
-            console.error('Error in checkJobMatch:', error);
-            sendResponse({ success: false, error: error.message || 'Unknown error' });
-          });
-      });
+    // Check if AI settings exist and at least one provider is enabled
+    chrome.storage.local.get(['aiSettings'], (result) => {
+      const aiSettings = result.aiSettings;
+      if (!aiSettings || !aiSettings.providers || aiSettings.providers.length === 0) {
+        sendResponse({ success: false, error: 'No AI settings configured' });
+        return;
+      }
+
+      const hasEnabledProvider = aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+      if (!hasEnabledProvider) {
+        sendResponse({ success: false, error: 'No AI provider enabled with API key' });
+        return;
+      }
+
+      handleJobMatch(jobDetails, resume)
+        .then((data) => {
+          sendResponse({ success: true, data });
+        })
+        .catch((error) => {
+          console.error('Error in checkJobMatch:', error);
+          sendResponse({ success: false, error: error.message || 'Unknown error' });
+        });
+    });
     return true; // Keep channel open
   }
 
   if (request.action === 'answerJobQuestions') {
-    const { inputs, radios, dropdowns, checkboxes, resume } = request;
+    const { inputs, radios, dropdowns, checkboxes, resume } = request as {
+      inputs: any[];
+      radios: any[];
+      dropdowns: any[];
+      checkboxes: any[];
+      resume: string;
+    };
     console.log('Received answerJobQuestions request');
 
-    ensureTokenValid()
-      .then(isValid => {
-        if (!isValid) {
-          sendResponse({ success: false, error: 'API token expired or invalid' });
-          return;
-        }
-        handleQuestionAnswering(inputs, radios, dropdowns, checkboxes, resume)
-          .then((data) => {
-            sendResponse({ success: true, data });
-          })
-          .catch((error) => {
-            console.error('Error in answerJobQuestions:', error);
-            sendResponse({ success: false, error: error.message || 'Unknown error' });
-          });
-      });
+    // Check if AI settings exist and at least one provider is enabled
+    chrome.storage.local.get(['aiSettings'], (result) => {
+      const aiSettings = result.aiSettings;
+      if (!aiSettings || !aiSettings.providers || aiSettings.providers.length === 0) {
+        sendResponse({ success: false, error: 'No AI settings configured' });
+        return;
+      }
+
+      const hasEnabledProvider = aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+      if (!hasEnabledProvider) {
+        sendResponse({ success: false, error: 'No AI provider enabled with API key' });
+        return;
+      }
+
+      handleQuestionAnswering(inputs, radios, dropdowns, checkboxes, resume)
+        .then((data) => {
+          sendResponse({ success: true, data });
+        })
+        .catch((error) => {
+          console.error('Error in answerJobQuestions:', error);
+          sendResponse({ success: false, error: error.message || 'Unknown error' });
+        });
+    });
     return true; // Keep channel open
   }
 
   if (request.action === 'filterCompanies') {
-    const { companies } = request;
+    const { companies } = request as { companies: string[] };
     console.log('Received filterCompanies request for', companies.length, 'companies');
 
-    ensureTokenValid()
-      .then(isValid => {
-        if (!isValid) {
-          sendResponse({ success: false, error: 'API token expired or invalid' });
-          return;
-        }
-        handleCompanyFiltering(companies)
-          .then((data) => {
-            sendResponse({ success: true, data });
-          })
-          .catch((error) => {
-            console.error('Error in filterCompanies:', error);
-            sendResponse({ success: false, error: error.message || 'Unknown error' });
-          });
-      });
+    // Check if AI settings exist and at least one provider is enabled
+    chrome.storage.local.get(['aiSettings'], (result) => {
+      const aiSettings = result.aiSettings;
+      if (!aiSettings || !aiSettings.providers || aiSettings.providers.length === 0) {
+        sendResponse({ success: false, error: 'No AI settings configured' });
+        return;
+      }
+
+      const hasEnabledProvider = aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+      if (!hasEnabledProvider) {
+        sendResponse({ success: false, error: 'No AI provider enabled with API key' });
+        return;
+      }
+
+      handleCompanyFiltering(companies)
+        .then((data) => {
+          sendResponse({ success: true, data });
+        })
+        .catch((error) => {
+          console.error('Error in filterCompanies:', error);
+          sendResponse({ success: false, error: error.message || 'Unknown error' });
+        });
+    });
     return true;
   }
 
   if (request.action === 'generateResume') {
-    const { prompt } = request;
-    ensureTokenValid()
-      .then(isValid => {
-        if (!isValid) {
-          sendResponse({ success: false, error: 'API token expired or invalid' });
-          return;
-        }
-        aiService.sendRequest({ prompt: prompt })
-          .then((response) => {
-            sendResponse({ success: true, data: response });
-          })
-          .catch((error) => {
-            console.error('Error in generateResume:', error);
-            sendResponse({ success: false, error: error.message || 'Unknown error' });
-          });
-      });
+    const { prompt } = request as { prompt: string };
+    
+    // Check if AI settings exist and at least one provider is enabled
+    chrome.storage.local.get(['aiSettings'], (result) => {
+      const aiSettings = result.aiSettings;
+      if (!aiSettings || !aiSettings.providers || aiSettings.providers.length === 0) {
+        sendResponse({ success: false, error: 'No AI settings configured' });
+        return;
+      }
+
+      const hasEnabledProvider = aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+      if (!hasEnabledProvider) {
+        sendResponse({ success: false, error: 'No AI provider enabled with API key' });
+        return;
+      }
+
+      aiService.sendRequest({ prompt: prompt })
+        .then((response) => {
+          sendResponse({ success: true, data: response });
+        })
+        .catch((error) => {
+          console.error('Error in generateResume:', error);
+          sendResponse({ success: false, error: error.message || 'Unknown error' });
+        });
+    });
     return true;
   }
 
@@ -352,8 +391,8 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-async function handleCompanyFiltering(companies: string[]) {
-  const promptText = 'Find the company category(product based or service based also mention their industries and add a parameter is_it as (true or false, based on IT or non-IT) and output as a json as {"product_companies": [{"company_name":"","industry":"", is_it: true}], "service_companies": [...]} for the below companies: ' + JSON.stringify(companies);
+async function handleCompanyFiltering(companies: string[]): Promise<{ product_companies: any[], service_companies: any[] }> {
+  const promptText = 'Find the company category(product based or service based also mention their industries and add a parameter is_it as (true or false, based on IT or non-IT) and output as {"product_companies": [{"company_name":"","industry":"", is_it: true}], "service_companies": [...]} for the below companies: ' + JSON.stringify(companies);
 
   const response = await aiService.sendRequest({ prompt: promptText });
   const contentText = response.content;
@@ -371,7 +410,7 @@ async function handleCompanyFiltering(companies: string[]) {
 }
 
 
-async function handleJobMatch(jobDetails: any, resume: string) {
+async function handleJobMatch(jobDetails: any, resume: string): Promise<any> {
   // Construct the prompt
   const promptText = 'As per resume and jd provided Also note: company must be primary product based company(IT, non-IT) or non-IT based service companies only. Output as {"company_name":"","company_type":"service/product", "industry":"IT/Non-IT","match_score":0} note match_score based on [1. Average Match, 2. Above average, 3. Good, 4. Excellent, 5. Outstanding]. Resume: ' + resume + " JD: Title:" + jobDetails.jobTitle + " Desc: " + jobDetails.description + " Company: " + jobDetails.company;
 
@@ -490,7 +529,12 @@ async function handleQuestionAnswering(
   dropdowns: any[],
   checkboxes: any[],
   resume: string
-) {
+): Promise<{
+  inputs: Record<string, string>;
+  dropdowns: Record<string, string>;
+  radios: Record<string, string>;
+  checkboxes: Record<string, string>;
+}> {
 
   const promptText = `Do not specify resume in solution and when asked for numbers give pure numbers without any words.Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)} Resume: ${resume}`;
 

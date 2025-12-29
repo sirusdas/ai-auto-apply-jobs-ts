@@ -354,32 +354,44 @@ async function discardApplication() {
 // --- Phase 3: AI Fetch ---
 
 async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise<Answers | null> {
-    const settings = await chrome.storage.local.get(['aiSettings', 'compressedResumeYAML', 'plainTextResume', 'tokenData']);
+    const settings = await chrome.storage.local.get(['aiSettings', 'compressedResumeYAML', 'plainTextResume']);
 
-    // Check if token is valid
-    const tokenData = settings.tokenData;
-    const isTokenValid = tokenData?.valid && new Date(tokenData.expires_at).getTime() > Date.now();
-    
-    if (!isTokenValid) {
-        console.warn('API Token is missing or invalid. Please check your settings.');
+    // Check if AI settings exist and at least one provider is enabled
+    if (!settings.aiSettings || !settings.aiSettings.providers || settings.aiSettings.providers.length === 0) {
+        console.warn('AI settings not found. Please configure AI providers in settings.');
         // Show notification to user
         chrome.runtime.sendMessage({
             action: 'showNotification',
             notification: {
                 type: 'basic',
-                title: 'API Token Required',
-                message: 'Please update your API token to continue using AI features.',
+                title: 'AI Settings Required',
+                message: 'Please configure your AI providers in settings.',
                 iconUrl: 'laaa_logo_128x128.png'
             }
         });
         
         // Open settings page
-        chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#settings') });
+        chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#ai-providers') });
         return null;
     }
 
-    if (!settings.aiSettings) {
-        console.warn('AI settings not found. Please configure AI providers in settings.');
+    // Check if at least one provider is enabled
+    const hasEnabledProvider = settings.aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+    if (!hasEnabledProvider) {
+        console.warn('No AI providers enabled. Please enable at least one AI provider in settings.');
+        // Show notification to user
+        chrome.runtime.sendMessage({
+            action: 'showNotification',
+            notification: {
+                type: 'basic',
+                title: 'AI Provider Required',
+                message: 'Please enable at least one AI provider in settings.',
+                iconUrl: 'laaa_logo_128x128.png'
+            }
+        });
+        
+        // Open settings page
+        chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#ai-providers') });
         return null;
     }
 

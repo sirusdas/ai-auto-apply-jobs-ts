@@ -1133,81 +1133,22 @@ async function goToNextPage() {
 
 // --- Helpers reused/preserved ---
 
-async function fetchJobDetails(): Promise<any> {
-  try {
-    await addVeryShortDelay();
-    const companyElement = document.querySelector('.job-details-jobs-unified-top-card__company-name a');
-    const company = companyElement ? companyElement.textContent?.trim() : '';
-
-    // Check ignore list
-    const ignoreResult = await chrome.storage.local.get(['ignoreCompanies']);
-    const ignoreList = (ignoreResult.ignoreCompanies || '').split(',').map((s: string) => s.trim().toLowerCase());
-
-    if (company && ignoreList.some((ig: string) => ig && company.toLowerCase().includes(ig))) {
-      return false;
-    }
-
-    const jobTitleElement = document.querySelector('.t-24.job-details-jobs-unified-top-card__job-title h1 a');
-    const jobTitle = jobTitleElement ? jobTitleElement.textContent?.trim() : '';
-
-    // Extract job ID from the URL or job title link
-    let jobId = null;
-
-    // Try to get job ID from URL parameters first
-    const urlParams = new URLSearchParams(window.location.search);
-    jobId = urlParams.get('currentJobId');
-
-    // If not in query params, try to extract from path
-    if (!jobId) {
-      const match = window.location.pathname.match(/\/jobs\/view\/(\d+)\//);
-      if (match) {
-        jobId = match[1];
-      }
-    }
-
-    // If still no jobId, try to get it from the job title element href if it exists
-    if (!jobId && jobTitleElement && jobTitleElement instanceof HTMLAnchorElement) {
-      const href = jobTitleElement.href;
-      if (href) {
-        const hrefParams = new URLSearchParams(new URL(href).search);
-        jobId = hrefParams.get('currentJobId');
-
-        // If not in query params of href, try to extract from path
-        if (!jobId) {
-          const hrefMatch = href.match(/\/jobs\/view\/(\d+)\//);
-          if (hrefMatch) {
-            jobId = hrefMatch[1];
-          }
-        }
-      }
-    }
-
-    // If still no jobId, try to get it from the Easy Apply button
-    if (!jobId) {
-      const easyApplyButton = document.querySelector('button[data-job-id]');
-      if (easyApplyButton) {
-        jobId = easyApplyButton.getAttribute('data-job-id');
-      }
-    }
-
-    // Safe selectors for location
-    const locationElement = document.querySelector('.job-details-jobs-unified-top-card__primary-description-container .t-black--light span:first-child span:first-child') ||
-      document.querySelector('.job-details-jobs-unified-top-card__primary-description-container .t-black--light span:first-child');
-    const location = locationElement ? locationElement.textContent?.trim() : '';
-
-    const descriptionElement = document.querySelector('#job-details');
-    const description = descriptionElement ? descriptionElement.textContent?.trim() : '';
-
-    return { jobTitle, company, location, description, jobId };
-  } catch (e) {
-    console.error(e);
-    return false;
-  }
-}
+// Consolidated with extractJobDetails
 
 async function checkJobMatch(jobDetails: any): Promise<number | false> {
-  const tokenRes = await chrome.storage.local.get(['accessToken', 'applyToProductCompanies', 'applyToServiceCompanies', 'minMatchScore', 'compressedResumeYAML', 'plainTextResume']);
-  if (!tokenRes.accessToken) return false;
+  const tokenRes = await chrome.storage.local.get(['aiSettings', 'applyToProductCompanies', 'applyToServiceCompanies', 'minMatchScore', 'compressedResumeYAML', 'plainTextResume']);
+
+  // Check if AI settings exist and at least one provider is enabled
+  if (!tokenRes.aiSettings || !tokenRes.aiSettings.providers || tokenRes.aiSettings.providers.length === 0) {
+    console.warn('AI settings not found. Please configure AI providers in settings.');
+    return false;
+  }
+
+  const hasEnabledProvider = tokenRes.aiSettings.providers.some((provider: any) => provider.enabled && provider.apiKey);
+  if (!hasEnabledProvider) {
+    console.warn('No AI providers enabled. Please enable at least one AI provider in settings.');
+    return false;
+  }
 
   // Default preferences
   const applyProduct = tokenRes.applyToProductCompanies !== undefined ? tokenRes.applyToProductCompanies : true;
@@ -1221,8 +1162,7 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
         {
           action: 'checkJobMatch',
           jobDetails,
-          resume,
-          accessToken: tokenRes.accessToken
+          resume
         },
         (response) => {
           if (chrome.runtime.lastError) {
@@ -1347,91 +1287,51 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
   console.log(`Target Job: ${jobDetails.jobTitle} at ${jobDetails.company}`);
 
   try {
-    // Click the job card/list item
-    console.log('Clicking job card...');
     const listItem = jobDetails.listItem as HTMLElement;
-
-    // Ensure the element is visible and clickable
     listItem.scrollIntoView({ behavior: 'auto', block: 'center' });
     await addVeryShortDelay();
 
-    // Try multiple methods to click the job
     let clicked = false;
-
-    // Method 1: Find and click the job title link within the item (most reliable)
     const titleLink = listItem.querySelector('a[href*="/jobs/view/"]') ||
       listItem.querySelector('.job-card-list__title a') ||
       listItem.querySelector('.artdeco-entity-lockup__title a') ||
+      listItem.querySelector('.job-card-container__title a') ||
+      listItem.querySelector('.job-card-list__title--link') ||
+      listItem.querySelector('.job-card-container__primary-description a') ||
       listItem.querySelector('a[data-control-name="job_card_title"]');
 
     if (titleLink) {
-      try {
-        titleLink.scrollIntoView({ behavior: 'auto', block: 'center' });
-        await addVeryShortDelay();
-        (titleLink as HTMLElement).click();
-        clicked = true;
-        console.log('Clicked job title link');
-      } catch (e) {
-        console.log('Failed to click job title link', e);
-      }
+      console.log('Found job title link:', titleLink);
+      (titleLink as HTMLElement).click();
+      clicked = true;
     }
 
-    // Method 2: Click the list item directly
     if (!clicked) {
-      try {
-        listItem.click();
-        clicked = true;
-        console.log('Clicked list item directly');
-      } catch (e) {
-        console.log('Failed to click list item directly', e);
-      }
-    }
-
-    // Method 3: Dispatch click event
-    if (!clicked) {
-      try {
-        const clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window
-        });
-        listItem.dispatchEvent(clickEvent);
-        clicked = true;
-        console.log('Dispatched click event on list item');
-      } catch (e) {
-        console.log('Failed to dispatch click event', e);
-      }
+      console.log('No job title link found. Clicking job card...');
+      listItem.click();
+      clicked = true;
     }
 
     if (!clicked) {
       throw new Error('Unable to click job card');
     }
 
-    // Wait for job details to load and verify it's the correct job
+    // Wait for the job details page to load
     console.log('Waiting for job details pane to update...');
     let jobDetailsData: any = null;
     let retries = 0;
-    const maxRetries = 30; // Increased retries
+    const maxRetries = 30;
     const targetTitle = jobDetails.jobTitle.toLowerCase().trim();
     const targetCompany = jobDetails.company.toLowerCase().trim();
 
-    // Wait for job details with timeout
     while (retries < maxRetries) {
+      if (!currentState || !currentState.isRunning) return;
       await addShortDelay();
-
-      // Try to extract job details
       jobDetailsData = await extractJobDetails();
 
-      if (jobDetailsData &&
-        jobDetailsData.jobTitle &&
-        jobDetailsData.company &&
-        jobDetailsData.jobTitle.trim() !== '' &&
-        jobDetailsData.company.trim() !== '') {
-
+      if (jobDetailsData && jobDetailsData.jobTitle && jobDetailsData.company) {
         const loadedTitle = jobDetailsData.jobTitle.toLowerCase().trim();
         const loadedCompany = jobDetailsData.company.toLowerCase().trim();
-
-        // Verify it matches the target job
         const titleMatch = loadedTitle.includes(targetTitle) || targetTitle.includes(loadedTitle);
         const companyMatch = loadedCompany.includes(targetCompany) || targetCompany.includes(loadedCompany);
 
@@ -1440,43 +1340,30 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
         console.log(`  Got:      "${loadedTitle}" at "${loadedCompany}"`);
         console.log(`  Title match: ${titleMatch}, Company match: ${companyMatch}`);
 
-        // Check for exact matches or strong partial matches
-        if ((titleMatch && companyMatch) ||
-          (loadedTitle === targetTitle && loadedCompany === targetCompany)) {
+        if (titleMatch && companyMatch) {
           console.log('Correct job details loaded!');
           break;
         }
       }
-
       retries++;
       console.log(`Retry ${retries}/${maxRetries} - Still waiting for correct job details to load...`);
     }
 
     if (!jobDetailsData || retries >= maxRetries) {
-      console.log('Failed to load matching job details (timeout or mismatch). Skipping.');
+      console.log('Failed to load matching job details. Skipping...');
       return;
     }
-
-    console.log(`Details Loaded: ${jobDetailsData.jobTitle} at ${jobDetailsData.company}`);
-    console.log('Matching against criteria...');
 
     // Check if job matches criteria
     const matchScore = await checkJobMatch(jobDetailsData);
-    console.log(`Job match score: ${matchScore}`);
-
-    // Only skip if we explicitly get false, not for other falsy values like null or 0
     if (matchScore === false) {
-      console.log('Job does not match criteria. Skipping.');
+      console.log('Job does not match criteria. Skipping...');
       return;
     }
 
-    // If we have a numeric score (including 0), check against minimum
     if (typeof matchScore === 'number') {
-      // Check if match score meets minimum requirement
       const minScoreResult = await chrome.storage.local.get(['minMatchScore']);
       const minScore = parseInt(minScoreResult.minMatchScore || '3');
-      console.log(`Minimum required score: ${minScore}, Actual score: ${matchScore}`);
-
       if (matchScore < minScore) {
         console.log(`Job match score (${matchScore}) below minimum (${minScore}). Skipping.`);
         return;
@@ -1484,8 +1371,6 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     }
 
     console.log(`Job match score: ${matchScore}. Proceeding to apply...`);
-
-    // Apply to the job
     await applyToJob(jobDetailsData);
 
   } catch (e) {
@@ -1495,7 +1380,7 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
   }
 }
 
-async function extractJobDetails() {
+async function extractJobDetails(): Promise<any> {
   try {
     // Try multiple selectors for company name
     const companySelectors = [
@@ -1515,6 +1400,15 @@ async function extractJobDetails() {
       if (companyEl) {
         company = companyEl.textContent?.trim() || '';
         if (company) break;
+      }
+    }
+
+    // Check ignore list
+    if (company) {
+      const ignoreResult = await chrome.storage.local.get(['ignoreCompanies']);
+      const ignoreList = (ignoreResult.ignoreCompanies || '').split(',').map((s: string) => s.trim().toLowerCase());
+      if (ignoreList.some((ig: string) => ig && company.toLowerCase().includes(ig))) {
+        return false;
       }
     }
 
@@ -1557,7 +1451,6 @@ async function extractJobDetails() {
       const locationEl = document.querySelector(selector);
       if (locationEl) {
         const text = locationEl.textContent?.trim() || '';
-        // Make sure it's not too long and doesn't contain obvious non-location text
         if (text && !text.includes('LinkedIn') && text.length < 100 && text.length > 1) {
           location = text;
           break;
@@ -1587,28 +1480,19 @@ async function extractJobDetails() {
 
     // Try to get job ID
     let jobId = null;
-
-    // Try from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     jobId = urlParams.get('currentJobId');
 
-    // Try from URL path
     if (!jobId) {
       const match = window.location.pathname.match(/\/jobs\/view\/(\d+)\//);
-      if (match) {
-        jobId = match[1];
-      }
+      if (match) jobId = match[1];
     }
 
-    // Try from job details element attributes
     if (!jobId) {
-      const jobDetailsElement = document.querySelector('.job-details-jobs-unified-top-card');
-      if (jobDetailsElement) {
-        jobId = jobDetailsElement.getAttribute('data-entity-urn')?.split(':').pop() || null;
-      }
+      const easyApplyButton = document.querySelector('button[data-job-id]');
+      if (easyApplyButton) jobId = easyApplyButton.getAttribute('data-job-id');
     }
 
-    // Return the collected data if we have at least a job title or company
     if (jobTitle || company) {
       return { jobTitle, company, location, description, jobId };
     }
@@ -1784,30 +1668,4 @@ async function checkTokenValidity(): Promise<boolean> {
 }
 
 // Modify the main auto-apply function to check token first
-async function startAutoApply() {
-  // Check if token is valid before starting
-  const isTokenValid = await checkTokenValidity();
-
-  if (!isTokenValid) {
-    // Show notification about invalid token
-    chrome.runtime.sendMessage({
-      action: 'showNotification',
-      notification: {
-        type: 'basic',
-        title: 'API Token Required',
-        message: 'Please update your API token to continue using AI features.',
-        iconUrl: 'laaa_logo_128x128.png'
-      }
-    });
-
-    // Open settings page
-    chrome.runtime.sendMessage({
-      action: 'openPage',
-      url: chrome.runtime.getURL('settings.html#settings')
-    });
-
-    return;
-  }
-
-  // Existing auto-apply logic continues here...
-}
+// Redundant startAutoApply removed
