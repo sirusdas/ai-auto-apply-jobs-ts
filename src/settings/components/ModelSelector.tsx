@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AI_MODELS, ModelInfo } from '../../constants/aiModels';
+import { fetchProviderModels } from '../../utils/modelFetcher';
 
 interface ModelSelectorProps {
     providerId: string;
@@ -12,12 +13,15 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isCustomMode, setIsCustomMode] = useState(false);
+    const [dynamicModels, setDynamicModels] = useState<ModelInfo[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [useDynamicModels, setUseDynamicModels] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const models = AI_MODELS[providerId] || [];
+    const staticModels = AI_MODELS[providerId] || [];
 
     // Check if current model is one of the presets
-    const isPresetModel = models.some(m => m.id === selectedModel);
+    const isPresetModel = staticModels.some(m => m.id === selectedModel);
 
     useEffect(() => {
         if (!isPresetModel && selectedModel && !isCustomMode) {
@@ -35,10 +39,51 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const filteredModels = models.filter(m =>
+    // Load dynamic models when switching to dynamic mode
+    const loadDynamicModels = async () => {
+        setIsLoading(true);
+        try {
+            // Get API key from localStorage to fetch models
+            const storedSettings = await chrome.storage.local.get(['aiSettings']);
+            const aiSettings = storedSettings.aiSettings;
+            
+            if (aiSettings && aiSettings.providers) {
+                const provider = aiSettings.providers.find(p => p.id === providerId);
+                
+                if (provider && provider.apiKey) {
+                    const models = await fetchProviderModels(providerId, provider.apiKey);
+                    setDynamicModels(models);
+                    setUseDynamicModels(true);
+                } else {
+                    // If no API key is available, fall back to static models
+                    setDynamicModels(staticModels);
+                    setUseDynamicModels(true);
+                }
+            } else {
+                // If no settings are available, fall back to static models
+                setDynamicModels(staticModels);
+                setUseDynamicModels(true);
+            }
+        } catch (error) {
+            console.error(`Error fetching ${providerId} models:`, error);
+            // Fall back to static models if there's an error
+            setDynamicModels(staticModels);
+            setUseDynamicModels(true);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleRefreshClick = () => {
+        loadDynamicModels();
+    };
+
+    const modelsToUse = useDynamicModels ? dynamicModels : staticModels;
+
+    const filteredModels = modelsToUse.filter(m =>
         m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (m.description && m.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const handleSelect = (modelId: string) => {
@@ -52,7 +97,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
         onModelChange(e.target.value);
     };
 
-    const selectedModelInfo = models.find(m => m.id === selectedModel);
+    const selectedModelInfo = modelsToUse.find(m => m.id === selectedModel);
 
     return (
         <div className="model-selector" ref={dropdownRef}>
@@ -84,23 +129,66 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
                         {selectedModelInfo?.isPaid && <span className="badge paid">PAID</span>}
                         {selectedModelInfo?.tier === 'free' && <span className="badge free">FREE</span>}
                     </div>
-                    <span className="arrow">{isOpen ? '▲' : '▼'}</span>
+                    <div className="trigger-controls">
+                        <button 
+                            className="refresh-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleRefreshClick();
+                            }}
+                            title="Refresh models from API"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? '🔄' : '🔄'}
+                        </button>
+                        <span className="arrow">{isOpen ? '▲' : '▼'}</span>
+                    </div>
                 </div>
             )}
 
             {isOpen && !isCustomMode && (
                 <div className="model-dropdown">
-                    <div className="dropdown-search">
-                        <input
-                            type="text"
-                            placeholder="Search models..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            autoFocus
-                        />
+                    <div className="dropdown-controls">
+                        <div className="dropdown-search">
+                            <input
+                                type="text"
+                                placeholder="Search models..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="controls-right">
+                            <button 
+                                className="refresh-btn-small"
+                                onClick={handleRefreshClick}
+                                title="Refresh models from API"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? '🔄 Loading...' : '🔄 Refresh'}
+                            </button>
+                            <button 
+                                className={`mode-toggle ${useDynamicModels ? 'active' : ''}`}
+                                onClick={loadDynamicModels}
+                                title={useDynamicModels ? "Switch to default models" : "Load models from API"}
+                                disabled={isLoading}
+                            >
+                                {useDynamicModels ? '🌐 API' : '📦 Default'}
+                            </button>
+                        </div>
                     </div>
                     <div className="dropdown-options">
-                        {filteredModels.map(model => (
+                        {isLoading && (
+                            <div className="loading-indicator">
+                                Loading models from {providerId.charAt(0).toUpperCase() + providerId.slice(1)} API...
+                            </div>
+                        )}
+                        {!isLoading && filteredModels.length === 0 && (
+                            <div className="no-results">
+                                No models found matching "{searchTerm}"
+                            </div>
+                        )}
+                        {!isLoading && filteredModels.map(model => (
                             <div
                                 key={model.id}
                                 className={`model-option ${selectedModel === model.id ? 'active' : ''}`}
@@ -158,12 +246,35 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
                     align-items: center;
                     gap: 8px;
                     overflow: hidden;
+                    flex: 1;
                 }
                 .model-name {
                     font-weight: 500;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                }
+                .trigger-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .refresh-btn {
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 14px;
+                    padding: 0;
+                    margin-right: 5px;
+                    opacity: 0.7;
+                    transition: opacity 0.2s;
+                }
+                .refresh-btn:hover {
+                    opacity: 1;
+                }
+                .refresh-btn:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
                 }
                 .badge {
                     font-size: 10px;
@@ -189,9 +300,16 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
                     display: flex;
                     flex-direction: column;
                 }
-                .dropdown-search {
+                .dropdown-controls {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                     padding: 10px;
                     border-bottom: 1px solid #eee;
+                    gap: 10px;
+                }
+                .dropdown-search {
+                    flex: 1;
                 }
                 .dropdown-search input {
                     width: 100%;
@@ -199,6 +317,46 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
                     border: 1px solid #ddd;
                     border-radius: 4px;
                     font-size: 14px;
+                }
+                .controls-right {
+                    display: flex;
+                    gap: 8px;
+                }
+                .refresh-btn-small {
+                    background: #f0f7ff;
+                    border: 1px solid #2196F3;
+                    border-radius: 4px;
+                    padding: 5px 8px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                .refresh-btn-small:hover:not(:disabled) {
+                    background: #e3f2fd;
+                }
+                .refresh-btn-small:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+                .mode-toggle {
+                    background: #f0f7ff;
+                    border: 1px solid #2196F3;
+                    border-radius: 4px;
+                    padding: 5px 8px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                .mode-toggle:hover:not(:disabled) {
+                    background: #e3f2fd;
+                }
+                .mode-toggle.active {
+                    background: #2196F3;
+                    color: white;
+                }
+                .mode-toggle:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
                 }
                 .dropdown-options {
                     overflow-y: auto;
@@ -272,6 +430,12 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
                 }
                 .btn-text:hover { color: #ef4444; }
                 .plus { font-size: 18px; vertical-align: middle; margin-right: 4px; }
+                .loading-indicator, .no-results {
+                    padding: 20px;
+                    text-align: center;
+                    color: #666;
+                    font-style: italic;
+                }
             `}} />
         </div>
     );
