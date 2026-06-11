@@ -1,5 +1,6 @@
 
 import { addDelay, addShortDelay, addVeryShortDelay } from '../utils/delay';
+import { saveJob, jobExists } from '../utils/indexedDB';
 
 interface QuestionData {
     inputs: string[];
@@ -1679,40 +1680,41 @@ export async function saveAppliedJob(jobDetails: any) {
     console.log('Saving applied job with form data:', jobDetails);
     const now = new Date();
     const isoDate = now.toISOString();
-    const dateKey = isoDate.split('T')[0];
 
-    const result = await chrome.storage.local.get(['appliedJobs']);
-    const appliedJobs = result.appliedJobs || {};
+    if (!jobDetails) {
+        console.log('No job details provided, skipping save');
+        return;
+    }
 
-    if (!appliedJobs[dateKey]) appliedJobs[dateKey] = [];
+    // Generate unique ID for the job
+    const jobId = `${jobDetails.company}-${isoDate}`;
 
-    // Check for duplicates in the current day's list (optimistic)
-    const exists = appliedJobs[dateKey].some((j: any) =>
-        j.jobTitle === jobDetails?.jobTitle &&
-        j.company === jobDetails?.company
-    );
+    // Check for duplicates using IndexedDB
+    const exists = await jobExists(jobId);
 
-    if (!exists && jobDetails) {
-        // Include form data with job details
-        const jobWithFormData = {
-            ...jobDetails,
-            appliedDate: isoDate, // Full timestamp for accurate sorting and display
-            applicationFormData: applicationFormData || null
-        };
-
-        appliedJobs[dateKey].push(jobWithFormData);
-        await chrome.storage.local.set({ appliedJobs });
+    if (!exists) {
+        // Save job to IndexedDB with all required fields
+        await saveJob({
+            id: jobId,
+            jobTitle: jobDetails.jobTitle,
+            company: jobDetails.company,
+            location: jobDetails.location || '',
+            appliedDate: isoDate,
+            applicationFormData: applicationFormData || null,
+            archived: false,
+            createdAt: Date.now()
+        });
 
         // Also update a global count if needed
         chrome.runtime.sendMessage({ action: 'updateJobCount' });
 
         console.log(`Successfully saved job: ${jobDetails.jobTitle} at ${jobDetails.company}`);
-
-        // Clear form data after saving
-        applicationFormData = null;
-    } else if (exists) {
-        console.log(`Job already marked as applied today: ${jobDetails.jobTitle} at ${jobDetails.company}`);
+    } else {
+        console.log(`Job already exists: ${jobDetails.jobTitle} at ${jobDetails.company}`);
     }
+
+    // Clear form data after saving
+    applicationFormData = null;
 }
 
 export async function performSafetyReminderCheck() {

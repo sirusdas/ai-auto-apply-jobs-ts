@@ -14,6 +14,19 @@ import {
 } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
+import {
+  getAllJobs,
+  getStorageSize,
+  archiveOldJobs,
+  clearOldJobs,
+  migrateFromChromeStorage,
+  AppliedJob as IndexedDBJob
+} from '../../utils/indexedDB';
+import {
+  exportJobsToJSON,
+  exportJobsAsCSV,
+  formatBytes
+} from '../../utils/export';
 
 // Register Chart.js components
 ChartJS.register(
@@ -48,6 +61,11 @@ const AppliedJobs: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<AppliedJob | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [planType, setPlanType] = useState<string>('Free');
+  const [storageSize, setStorageSize] = useState<string>('0 KB');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showMigrationPrompt, setShowMigrationPrompt] = useState<boolean>(false);
+  const [migrationStatus, setMigrationStatus] = useState<string>('');
+  const [archivedJobsCount, setArchivedJobsCount] = useState<number>(0);
   const chartRef = useRef<any>(null);
 
   useEffect(() => {
@@ -67,32 +85,111 @@ const AppliedJobs: React.FC = () => {
   };
 
   useEffect(() => {
-    // Load applied jobs from storage
-    chrome.storage.local.get(['appliedJobs'], (result) => {
-      if (result.appliedJobs) {
-        const jobs: AppliedJob[] = [];
-        // Extract all jobs from the grouped storage structure
-        Object.keys(result.appliedJobs).forEach(dateKey => {
-          if (Array.isArray(result.appliedJobs[dateKey])) {
-            result.appliedJobs[dateKey].forEach((job: AppliedJob) => {
-              jobs.push({
-                ...job,
-                // Ensure we have a valid appliedDate string
-                appliedDate: job.appliedDate || dateKey
-              });
-            });
+    loadJobs();
+    loadStorageInfo();
+    checkForMigration();
+  }, []);
+
+  const loadJobs = async () => {
+    try {
+      setIsLoading(true);
+      const jobs = await getAllJobs();
+      // Transform jobs to match AppliedJob interface
+      const transformedJobs: AppliedJob[] = jobs.map(job => ({
+        jobTitle: job.jobTitle,
+        company: job.company,
+        location: job.location,
+        appliedDate: job.appliedDate,
+        applicationFormData: job.applicationFormData
+      }));
+      setAppliedJobs(transformedJobs);
+      setFilteredJobs(transformedJobs);
+      console.log(`Loaded ${jobs.length} jobs from IndexedDB`);
+    } catch (error) {
+      console.error('Error loading jobs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadStorageInfo = async () => {
+    try {
+      const size = await getStorageSize();
+      setStorageSize(formatBytes(size));
+    } catch (error) {
+      console.error('Error loading storage info:', error);
+    }
+  };
+
+  const checkForMigration = async () => {
+    chrome.storage.local.get(['appliedJobs'], async (result) => {
+      if (result.appliedJobs && Object.keys(result.appliedJobs).length > 0) {
+        setShowMigrationPrompt(true);
+        // Count jobs in old storage
+        let count = 0;
+        Object.values(result.appliedJobs).forEach((jobs: any) => {
+          if (Array.isArray(jobs)) {
+            count += jobs.length;
           }
         });
-
-        // Sort by date descending (latest first)
-        jobs.sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime());
-
-        setAppliedJobs(jobs);
-        setFilteredJobs(jobs);
-        console.log(`Loaded ${jobs.length} jobs, latest is ${jobs[0]?.jobTitle}`);
+        setArchivedJobsCount(count);
       }
     });
-  }, []);
+  };
+
+  const handleMigrateData = async () => {
+    try {
+      setMigrationStatus('Migrating data...');
+      chrome.storage.local.get(['appliedJobs'], async (result) => {
+        if (result.appliedJobs) {
+          const migratedCount = await migrateFromChromeStorage(result.appliedJobs);
+          setMigrationStatus(`Successfully migrated ${migratedCount} jobs!`);
+          setShowMigrationPrompt(false);
+          loadJobs();
+          loadStorageInfo();
+          
+          // Clear old data after successful migration
+          chrome.storage.local.remove('appliedJobs');
+        }
+      });
+    } catch (error) {
+      setMigrationStatus('Migration failed: ' + error);
+    }
+  };
+
+  const handleArchiveOldJobs = async (months: number) => {
+    if (confirm(`Archive all jobs older than ${months} months? Archived jobs will be kept but hidden from main view.`)) {
+      const count = await archiveOldJobs(months);
+      alert(`Archived ${count} jobs`);
+      loadJobs();
+      loadStorageInfo();
+    }
+  };
+
+  const handleClearOldJobs = async (months: number) => {
+    if (confirm(`PERMANENTLY DELETE all jobs older than ${months} months? This cannot be undone!`)) {
+      const count = await clearOldJobs(months);
+      alert(`Permanently deleted ${count} jobs`);
+      loadJobs();
+      loadStorageInfo();
+    }
+  };
+
+  const handleExportJSON = async () => {
+    try {
+      await exportJobsToJSON();
+    } catch (error) {
+      alert('Export failed: ' + error);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      await exportJobsAsCSV();
+    } catch (error) {
+      alert('Export failed: ' + error);
+    }
+  };
 
   useEffect(() => {
     // Apply filters
@@ -326,10 +423,71 @@ const AppliedJobs: React.FC = () => {
         </button>
       </h2>
 
+      {showMigrationPrompt && (
+        <div className="migration-notice">
+          <h3>Data Migration Available</h3>
+          <p>We found {archivedJobsCount} jobs stored in old format.</p>
+          <button className="btn btn-primary" onClick={handleMigrateData}>
+            Migrate to New Storage
+          </button>
+          {migrationStatus && <p className="migration-status">{migrationStatus}</p>}
+        </div>
+      )}
+
       <div className="stats">
         <h3>Total Jobs Applied: {getTotalJobsCount()}</h3>
         <div className="plan-badge">
           Current Plan: <span className={`badge plan-${planType.toLowerCase()}`}>{planType}</span>
+        </div>
+      </div>
+
+      <div className="data-management-section">
+        <h3>Storage & Data Management</h3>
+        
+        <div className="storage-info">
+          <span className="storage-label">Storage Used:</span>
+          <span className="storage-value">{storageSize}</span>
+        </div>
+        
+        <div className="management-actions">
+          <button className="btn btn-secondary" onClick={handleExportJSON}>
+            Export as JSON
+          </button>
+          <button className="btn btn-secondary" onClick={handleExportCSV}>
+            Export as CSV
+          </button>
+        </div>
+        
+        <div className="archive-actions">
+          <h4>Archive or Clear Old Jobs</h4>
+          <p className="warning-text">Archived jobs are kept but hidden. Cleared jobs are permanently deleted.</p>
+          
+          <div className="action-buttons">
+            <button 
+              className="btn btn-warning" 
+              onClick={() => handleArchiveOldJobs(6)}
+            >
+              Archive Jobs &gt; 6 Months
+            </button>
+            <button 
+              className="btn btn-warning" 
+              onClick={() => handleArchiveOldJobs(12)}
+            >
+              Archive Jobs &gt; 1 Year
+            </button>
+            <button 
+              className="btn btn-danger" 
+              onClick={() => handleClearOldJobs(12)}
+            >
+              Clear Jobs &gt; 1 Year
+            </button>
+            <button 
+              className="btn btn-danger" 
+              onClick={() => handleClearOldJobs(24)}
+            >
+              Clear Jobs &gt; 2 Years
+            </button>
+          </div>
         </div>
       </div>
 
@@ -810,6 +968,100 @@ const AppliedJobs: React.FC = () => {
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
           gap: 15px;
           margin-top: 10px;
+        }
+        
+        .data-management-section {
+          background: #f8f9fa;
+          padding: 20px;
+          margin: 20px 0;
+          border-radius: 8px;
+          border: 1px solid #dee2e6;
+        }
+        
+        .storage-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 15px;
+          font-size: 1.1em;
+        }
+        
+        .storage-label {
+          font-weight: bold;
+          color: #495057;
+        }
+        
+        .storage-value {
+          color: #007bff;
+          font-weight: bold;
+        }
+        
+        .management-actions,
+        .archive-actions {
+          margin-top: 15px;
+        }
+        
+        .archive-actions h4 {
+          margin-bottom: 10px;
+          color: #495057;
+        }
+        
+        .warning-text {
+          font-size: 0.9em;
+          color: #dc3545;
+          margin-bottom: 10px;
+        }
+        
+        .action-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        
+        .btn-warning {
+          background: #ffc107;
+          color: #212529;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .btn-warning:hover {
+          background: #e0a800;
+        }
+        
+        .btn-danger {
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .btn-danger:hover {
+          background: #c82333;
+        }
+        
+        .migration-notice {
+          background: #e7f3ff;
+          border: 1px solid #b8daff;
+          padding: 20px;
+          margin: 20px 0;
+          border-radius: 8px;
+          text-align: center;
+        }
+        
+        .migration-notice h3 {
+          color: #004085;
+          margin-bottom: 10px;
+        }
+        
+        .migration-status {
+          margin-top: 10px;
+          font-weight: bold;
+          color: #155724;
         }
       `}} />
     </div>
