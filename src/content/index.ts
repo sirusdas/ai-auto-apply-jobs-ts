@@ -54,6 +54,7 @@ let mainButton: HTMLButtonElement | null = null;
 let stopButton: HTMLButtonElement | null = null;
 let pauseButton: HTMLButtonElement | null = null;
 let timerButton: HTMLButtonElement | null = null;
+let settingsButton: HTMLButtonElement | null = null;
 let timerInterval: number | null = null;
 let segmentTimeout: number | null = null;
 let currentState: AutoApplyState | null = null;
@@ -990,11 +991,24 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
         companies,
         token: token // Updated param name to match background expected input if needed
       }, (res) => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else if (res && res.success) resolve(res.data);
-        else reject(res?.error);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (res && res.success) {
+          resolve(res.data);
+        } else {
+          const errorMsg = res?.error || 'AI service returned failure';
+          console.error('AI Company Filter Failed:', errorMsg);
+          // Instead of continuing blindly, alert the user
+          alert(`AI Service Error (Company Filter): ${errorMsg}\n\nPlease check your API key/model settings or contact support: tools.qerds@gmail.com`);
+          stopAutoApplyProcess();
+          resolve(null);
+        }
       });
     });
+
+    if (response === null) {
+      return jobDetails; // Return all jobs as fallback but we've already stopped the process
+    }
 
     const productCompanies = response.product_companies || [];
     const serviceCompanies = response.service_companies || [];
@@ -1167,19 +1181,20 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
           } else if (response && response.success) {
             resolve(response.data);
           } else {
-            console.error(response);
-            // Even if there's an error with the matching, we shouldn't necessarily skip the job
-            // Instead, we'll return a neutral score that allows processing to continue
+            const errorMsg = response?.error || 'AI service returned failure';
+            console.error('AI Service Failed:', errorMsg);
+            // Instead of continuing blindly, alert the user as requested
+            alert(`AI Service Issue: The AI service is having trouble. Please check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
+            stopAutoApplyProcess();
             resolve(null);
           }
         }
       );
     });
 
-    // If we received null (error case), return a neutral score to allow continuation
+    // If we received null (service failure), return false to stop processing this job
     if (response === null) {
-      console.log('Job matching service unavailable, proceeding with neutral score');
-      return 3; // Return a middle score to allow processing
+      return false;
     }
 
     // Type check
@@ -1542,9 +1557,18 @@ function createControlButtons() {
   timerButton.style.width = '60px'; // Override width
   timerButton.style.borderRadius = '20px';
 
+  settingsButton = createButton(260, '#607D8B', `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-.957-1.712-.957-2.125 0l-.357.83a.644.644 0 0 1-.722.376l-.893-.232c-1.01-.263-1.947.532-1.684 1.542l.232.893a.644.644 0 0 1-.376.722l-.83.357c-.957.413-.957 1.712 0 2.125l.83.357a.644.644 0 0 1 .376.722l-.232.893c-.263 1.01.532 1.947 1.542 1.684l.893-.232a.644.644 0 0 1 .722.376l.357.83c.413.957 1.712.957 2.125 0l.357-.83a.644.644 0 0 1 .722-.376l.893.232c1.01.263 1.947-.532 1.684-1.542l-.232-.893a.644.644 0 0 1 .376-.722l.83-.357c.957-.413.957-1.712 0-2.125l-.83-.357a.644.644 0 0 1-.376-.722l.232-.893c.263-1.01-.532-1.947-1.542-1.684l-.893.232a.644.644 0 0 1-.722-.376l-.357-.83zM8 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>`);
+  settingsButton.title = 'Open Settings';
+  settingsButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'openPage', url: chrome.runtime.getURL('settings.html#ai-providers') });
+  });
+
   // Show help button
   const demoButton = document.getElementById('ai-job-applier-demo-button-root');
-  if (demoButton) demoButton.style.display = 'block';
+  if (demoButton) {
+    demoButton.style.display = 'block';
+    demoButton.style.right = '330px'; // Move help button further left
+  }
 }
 
 function createButton(rightOffset: number, color: string, html: string): HTMLButtonElement {
@@ -1620,6 +1644,7 @@ function removeControlUI() {
   if (stopButton) { stopButton.remove(); stopButton = null; }
   if (pauseButton) { pauseButton.remove(); pauseButton = null; }
   if (timerButton) { timerButton.remove(); timerButton = null; }
+  if (settingsButton) { settingsButton.remove(); settingsButton = null; }
 
   // Hide help button
   const demoButton = document.getElementById('ai-job-applier-demo-button-root');

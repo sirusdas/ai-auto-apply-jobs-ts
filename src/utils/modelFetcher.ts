@@ -29,7 +29,7 @@ interface GeminiListModelResponse {
     description: string;
     inputTokenLimit: number;
     outputTokenLimit: number;
-    supportedActions: string[];
+    supportedGenerationMethods: string[];
   }>;
 }
 
@@ -177,7 +177,7 @@ export async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
     const data: GeminiListModelResponse = await response.json();
     
     return data.models
-      .filter(model => model.supportedActions.includes('generateContent')) // Only include models that can generate content
+      .filter(model => model.supportedGenerationMethods.includes('generateContent')) // Only include models that can generate content
       .map(model => {
         // Extract model ID from the name (which includes the "models/" prefix)
         const modelId = model.name.replace('models/', '');
@@ -198,19 +198,19 @@ export async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
       });
   } catch (error) {
     console.error('Error fetching Gemini models:', error);
-    // Return default models as fallback
+    // Return modern default models as fallback
     return [
       {
-        id: 'gemini-1.5-flash',
-        name: 'Gemini 1.5 Flash',
+        id: 'gemini-2.0-flash',
+        name: 'Gemini 2.0 Flash',
         description: 'Fast and cost-efficient for high-volume tasks.',
         isPaid: false,
         tier: 'free',
         contextWindow: '1M tokens'
       },
       {
-        id: 'gemini-1.5-pro',
-        name: 'Gemini 1.5 Pro',
+        id: 'gemini-2.0-pro',
+        name: 'Gemini 2.0 Pro',
         description: 'Most capable model for complex reasoning and tasks.',
         isPaid: false,
         tier: 'free',
@@ -233,5 +233,103 @@ export async function fetchProviderModels(providerId: string, apiKey: string): P
       return await fetchGeminiModels(apiKey);
     default:
       throw new Error(`Unsupported provider: ${providerId}`);
+  }
+}
+
+/**
+ * Handles AI model failures by attempting to find and switch to a working model
+ * @returns true if model was successfully fixed/switched, false otherwise
+ */
+export async function handleModelFailure(providerId: string): Promise<boolean> {
+  console.log(`Attempting to handle model failure for provider: ${providerId}`);
+  
+  try {
+    const result = await chrome.storage.local.get(['aiSettings']);
+    const aiSettings = result.aiSettings;
+    
+    if (!aiSettings || !aiSettings.providers) {
+      console.error('No AI settings found to update.');
+      return false;
+    }
+    
+    const providerIndex = aiSettings.providers.findIndex((p: any) => p.id === providerId);
+    if (providerIndex === -1) {
+      console.error(`Provider ${providerId} not found in settings.`);
+      return false;
+    }
+    
+    const provider = aiSettings.providers[providerIndex];
+    if (!provider.apiKey) {
+      console.error(`No API key for provider ${providerId}.`);
+      return false;
+    }
+    
+    // 1. Fetch available models from API
+    console.log(`Fetching latest models for ${providerId}...`);
+    const allAvailableModels = await fetchProviderModels(providerId, provider.apiKey);
+    
+    if (!allAvailableModels || allAvailableModels.length === 0) {
+      console.error(`No models returned from ${providerId} API.`);
+      return false;
+    }
+
+    console.log(`Total models found for ${providerId}: ${allAvailableModels.length}`);
+    console.log('Available model IDs:', allAvailableModels.map(m => m.id).join(', '));
+    
+    // 2. Select a replacement model
+    // CRITICAL: Exclude the current model that just failed
+    const otherModels = allAvailableModels.filter(m => m.id !== provider.model);
+    
+    if (otherModels.length === 0) {
+      console.error(`No alternative models found for ${providerId} after excluding ${provider.model}`);
+      return false;
+    }
+
+    // Preference order for selection: 
+    let newModelId = '';
+    
+    if (providerId === 'gemini') {
+      // For Gemini, prefer a free model that is NOT the current failing one
+      const freeModel = otherModels.find(m => 
+        m.id.includes('flash') || m.id.includes('gemma') || m.tier === 'free'
+      );
+      if (freeModel) newModelId = freeModel.id;
+    } else if (providerId === 'openai') {
+      const gpt4oMini = otherModels.find(m => m.id === 'gpt-4o-mini');
+      if (gpt4oMini) newModelId = gpt4oMini.id;
+    } else if (providerId === 'claude') {
+      const haiku = otherModels.find(m => m.id.includes('haiku'));
+      if (haiku) newModelId = haiku.id;
+    }
+    
+    // Fallback to first model in the "others" list if no specific preference found
+    if (!newModelId && otherModels.length > 0) {
+      newModelId = otherModels[0].id;
+    }
+    
+    if (newModelId) {
+      console.log(`Switching provider ${providerId} from ${provider.model} to ${newModelId}`);
+      
+      // 3. Update settings in storage
+      aiSettings.providers[providerIndex].model = newModelId;
+      await chrome.storage.local.set({ aiSettings });
+      
+      // 4. Notify user
+      chrome.runtime.sendMessage({
+        action: 'showNotification',
+        notification: {
+          title: 'AI Model Updated',
+          message: `Your ${providerId} model was outdated or failed. Automatically switched to ${newModelId}.`,
+          type: 'basic'
+        }
+      });
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error in handleModelFailure:', error);
+    return false;
   }
 }

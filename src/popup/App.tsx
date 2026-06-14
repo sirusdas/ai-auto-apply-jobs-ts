@@ -26,14 +26,6 @@ const App: React.FC = () => {
         <ul>
           <li>
             <button 
-              className={activeTab === 'settings' ? 'active' : ''} 
-              onClick={() => setActiveTab('settings')}
-            >
-              Settings
-            </button>
-          </li>
-          <li>
-            <button 
               className={activeTab === 'applied-jobs' ? 'active' : ''} 
               onClick={() => setActiveTab('applied-jobs')}
             >

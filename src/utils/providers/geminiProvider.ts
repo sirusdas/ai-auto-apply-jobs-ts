@@ -24,7 +24,9 @@ export class GeminiProvider implements IAIProvider {
         });
 
         if (!response.ok) {
-            throw new Error(`Gemini API error: ${response.statusText}`);
+            const errorBody = await response.json().catch(() => ({}));
+            const errorMsg = errorBody.error?.message || response.statusText || 'Unknown error';
+            throw new Error(`Gemini API error (${response.status}): ${errorMsg}`);
         }
 
         const result = await response.json();

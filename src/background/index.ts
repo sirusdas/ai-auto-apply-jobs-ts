@@ -106,20 +106,12 @@ async function checkTokenValidityOnStartup() {
     chrome.notifications.create('token-invalid', {
       type: 'basic',
       iconUrl: 'laaa_logo_128x128.png',
-      title: 'API Token Required',
+      title: 'API Token Invalid',
       message: 'Please update your API token to continue using AI features.',
-      priority: 2,
-      buttons: [{ title: 'Update Token' }]
+      priority: 2
     });
-
-    // Listen for notification click to open settings
-    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-      if (notificationId === 'token-invalid' && buttonIndex === 0) {
-        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
-      }
-    });
-  }
-}
+    }
+    }
 
 async function checkTokenExpiry() {
   const tokenData = await tokenService.getTokenData();
@@ -136,15 +128,7 @@ async function checkTokenExpiry() {
       iconUrl: 'laaa_logo_128x128.png',
       title: 'API Token Expired',
       message: 'Your API token has expired. Please renew it to continue using AI features.',
-      priority: 2,
-      buttons: [{ title: 'Renew Token' }]
-    });
-
-    // Listen for notification click to open settings
-    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-      if (notificationId === 'token-expired' && buttonIndex === 0) {
-        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
-      }
+      priority: 2
     });
   } else if (diffDays <= 7) {
     chrome.notifications.create('token-expiring', {
@@ -152,15 +136,7 @@ async function checkTokenExpiry() {
       iconUrl: 'laaa_logo_128x128.png',
       title: 'API Token Expiring Soon',
       message: `Your API token will expire in ${diffDays} days. Please renew it soon.`,
-      priority: 1,
-      buttons: [{ title: 'Renew Token' }]
-    });
-
-    // Listen for notification click to open settings
-    chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-      if (notificationId === 'token-expiring' && buttonIndex === 0) {
-        chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#settings') });
-      }
+      priority: 1
     });
   }
 }
@@ -198,6 +174,18 @@ async function ensureTokenValid(): Promise<boolean> {
 initAIService();
 initTokenManagement();
 initJobCount();
+
+function notifyAIFailure(error: any) {
+  console.error('AI Request failed after all attempts:', error);
+  
+  chrome.notifications.create('ai-failure', {
+    type: 'basic',
+    iconUrl: 'laaa_logo_128x128.png',
+    title: 'AI Service Issue',
+    message: 'The AI service is having trouble. Please check your AI settings and API keys, or contact support: tools.qerds@gmail.com',
+    priority: 2
+  });
+}
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
@@ -303,6 +291,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         })
         .catch((error) => {
           console.error('Error in checkJobMatch:', error);
+          notifyAIFailure(error);
           sendResponse({ success: false, error: error.message || 'Unknown error' });
         });
     });
@@ -339,6 +328,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         })
         .catch((error) => {
           console.error('Error in answerJobQuestions:', error);
+          notifyAIFailure(error);
           sendResponse({ success: false, error: error.message || 'Unknown error' });
         });
     });

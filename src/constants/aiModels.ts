@@ -11,25 +11,25 @@ export interface ModelInfo {
 export const AI_MODELS: Record<string, ModelInfo[]> = {
     gemini: [
         {
-            id: 'gemini-2.0-flash-exp',
-            name: 'Gemini 2.0 Flash (Experimental)',
-            description: 'Latest experimental model, fast and capable.',
+            id: 'gemini-2.5-flash',
+            name: 'Gemini 2.5 Flash',
+            description: 'Latest stable fast model, high-volume tasks.',
             isPaid: false,
             tier: 'free',
             contextWindow: '1M tokens'
         },
         {
-            id: 'gemini-1.5-pro',
-            name: 'Gemini 1.5 Pro',
-            description: 'Most capable model for complex reasoning and tasks.',
+            id: 'gemini-2.5-pro',
+            name: 'Gemini 2.5 Pro',
+            description: 'Latest stable pro model, complex reasoning.',
             isPaid: false,
             tier: 'free',
-            contextWindow: '2M tokens'
+            contextWindow: '1M tokens'
         },
         {
-            id: 'gemini-1.5-flash',
-            name: 'Gemini 1.5 Flash',
-            description: 'Fast and cost-efficient for high-volume tasks.',
+            id: 'gemini-2.0-flash',
+            name: 'Gemini 2.0 Flash',
+            description: 'Fast and versatile multimodal model.',
             isPaid: false,
             tier: 'free',
             contextWindow: '1M tokens'
@@ -46,14 +46,6 @@ export const AI_MODELS: Record<string, ModelInfo[]> = {
             id: 'gemma-3-27b-it',
             name: 'Gemma 3 27B IT',
             description: 'Open-source lightweight model from Google.',
-            isPaid: false,
-            tier: 'free',
-            contextWindow: '8k tokens'
-        },
-        {
-            id: 'gemma-2-9b-it',
-            name: 'Gemma 2 9B IT',
-            description: 'Smaller, faster open-source model.',
             isPaid: false,
             tier: 'free',
             contextWindow: '8k tokens'

@@ -406,13 +406,21 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                 checkboxes: questions.checkboxes,
                 resume: settings.compressedResumeYAML || settings.plainTextResume || ""
             }, (res) => {
-                if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-                else if (res && res.success) resolve(res.data);
-                else reject(res?.error);
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (res && res.success) {
+                    resolve(res.data);
+                } else {
+                    const errorMsg = res?.error || 'AI service returned failure';
+                    console.error('AI Question Answering Failed:', errorMsg);
+                    // Instead of continuing blindly, alert the user
+                    alert(`AI Service Issue: The AI service is having trouble. Please check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
+                    resolve(null);
+                }
             });
         });
         return response;
-    } catch (e) {
+    } catch (e: any) {
         console.error('AI Fetch Error:', e);
         return null;
     }

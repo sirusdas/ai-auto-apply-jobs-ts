@@ -40,7 +40,14 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Load dynamic models when switching to dynamic mode
+    // Load dynamic models when switching to dynamic mode or on mount
+    useEffect(() => {
+        if (!disabled) {
+            loadDynamicModels();
+        }
+    }, [providerId, disabled]);
+
+    // Load dynamic models from API
     const loadDynamicModels = async () => {
         setIsLoading(true);
         try {

@@ -5,7 +5,7 @@ import ModelSelector from './ModelSelector';
 const AIProviderSettings: React.FC = () => {
   const [settings, setSettings] = useState<AISettings>({
     providers: [
-      { id: 'gemini', name: 'Google Gemini', enabled: false, apiKey: '', model: 'gemma-3-27b-it', priority: 1 },
+      { id: 'gemini', name: 'Google Gemini', enabled: false, apiKey: '', model: 'gemini-2.0-flash', priority: 1 },
       { id: 'claude', name: 'Anthropic Claude', enabled: false, apiKey: '', model: 'claude-3-5-sonnet-20241022', priority: 2 },
       { id: 'openai', name: 'OpenAI ChatGPT', enabled: false, apiKey: '', model: 'gpt-4o', priority: 3 }
     ],
@@ -22,6 +22,17 @@ const AIProviderSettings: React.FC = () => {
         setSettings(result.aiSettings);
       }
     });
+
+    // Listen for changes from background model recovery
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.aiSettings) {
+        console.log('AIProviderSettings: Syncing with background storage changes...');
+        setSettings(changes.aiSettings.newValue);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
   const handleProviderChange = (id: string, field: keyof AIProvider, value: any) => {

@@ -300,8 +300,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  // Render the default component
-  renderComponent('settings');
+  // Render the default component or deep link
+  const hash = window.location.hash.substring(1);
+  const initialTab = hash || 'settings';
+  
+  // Update active tab in sidebar UI if it exists
+  if (sidebar) {
+    sidebar.querySelectorAll('button[data-tab]').forEach(button => {
+      if (button.getAttribute('data-tab') === initialTab) {
+        button.classList.add('active');
+      } else {
+        button.classList.remove('active');
+      }
+    });
+  }
+  
+  renderComponent(initialTab);
 
   // Render help button
   renderSettingsHelpButton();
