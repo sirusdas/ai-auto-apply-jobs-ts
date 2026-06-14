@@ -1246,7 +1246,14 @@ async function applyToJob(jobDetails: any) {
   try {
     console.log('Searching for Easy Apply buttons...');
     const buttons = Array.from(document.querySelectorAll('button'));
-    const easyApplyButtons = buttons.filter(b => b.innerText.includes('Easy Apply') && !b.hasAttribute('disabled'));
+    const easyApplyButtons = buttons.filter(b => {
+      const text = b.innerText.trim();
+      const isApplyText = text === 'Easy Apply' || text.includes('Easy Apply');
+      const isNotPill = !b.classList.contains('search-reusables__filter-pill-button');
+      const isNotFilter = !b.id.includes('searchFilter');
+      const isEnabled = !b.hasAttribute('disabled');
+      return isApplyText && isNotPill && isNotFilter && isEnabled;
+    });
 
     console.log(`Found ${buttons.length} total buttons, ${easyApplyButtons.length} enabled Easy Apply buttons`);
 
