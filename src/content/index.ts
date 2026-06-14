@@ -1,6 +1,7 @@
 // Import utility functions
 import { addDelay, addShortDelay, addVeryShortDelay } from '../utils/delay';
 import { handleEasyApplyModal } from './applyHandler';
+import { showToast } from '../utils/notifications';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { demoService } from '../services/demoService';
@@ -781,14 +782,42 @@ async function getDailyJobCount(): Promise<number> {
   });
 }
 
+function checkDailyLimitReached(): boolean {
+  const mainContent = document.querySelector('.jobs-details__main-content');
+  if (!mainContent) return false;
+
+  const feedbackMessages = mainContent.querySelectorAll('.artdeco-inline-feedback__message');
+  for (const msg of Array.from(feedbackMessages)) {
+    const text = msg.textContent?.trim() || '';
+    if (text.includes('limit daily submissions') || text.includes('apply tomorrow')) {
+      return true;
+    }
+  }
+
+  // Also check for the specific message text provided by the user in the whole main content text
+  const pageText = mainContent.textContent || '';
+  if (pageText.includes('limit daily submissions to maintain quality and prevent bots')) {
+    return true;
+  }
+
+  return false;
+}
+
 async function checkDailyLimit(): Promise<boolean> {
   const count = await getDailyJobCount();
   const limit = 50; // Hardcoded limit as per request similarity or could be config
   if (count >= limit) {
     console.log(`Daily limit of ${limit} jobs reached.`);
-    alert(`Daily limit of ${limit} jobs reached. Stopping script.`);
+    showToast(`Daily limit of ${limit} jobs reached. Stopping auto-apply.`, 'warning');
     return true;
   }
+
+  if (checkDailyLimitReached()) {
+    console.warn('LinkedIn daily submission limit reached UI message detected.');
+    showToast('LinkedIn Daily Limit Reached: LinkedIn has restricted further applications for today.', 'warning');
+    return true;
+  }
+
   return false;
 }
 
@@ -1302,6 +1331,11 @@ async function applyToJob(jobDetails: any) {
       }
     } else {
       console.log('Easy Apply button not found for this job.');
+      if (checkDailyLimitReached()) {
+        console.warn('LinkedIn daily submission limit reached. Stopping auto-apply.');
+        showToast('Daily Limit Reached: LinkedIn has restricted further applications for today.', 'warning');
+        stopAutoApplyProcess();
+      }
     }
   } catch (e) {
     console.error('Error in applyToJob:', e);
