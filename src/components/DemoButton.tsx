@@ -12,7 +12,7 @@ export const DemoButton: React.FC<DemoButtonProps> = ({ onStartDemo }) => {
     const handleSendEmail = () => {
         const subject = encodeURIComponent('LinkedIn Auto Apply - Issue Report');
         const body = encodeURIComponent(issueDetails);
-        window.location.href = `mailto:support@qerds.com?subject=${subject}&body=${body}`;
+        window.location.href = `mailto:tools.qerds@gmail.com?subject=${subject}&body=${body}`;
         setIsIssueModalOpen(false);
         setIssueDetails('');
     };
