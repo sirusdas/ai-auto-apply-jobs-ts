@@ -35,12 +35,28 @@ A Chrome extension that automates and auto-fills job applications on LinkedIn wi
 # Install dependencies
 npm install
 
-# Build the extension
+# Build the extension (development)
+npm run build:dev
+
+# Production build
 npm run build
 
 # Development mode with watch
 npm run dev
 ```
+
+### Packaging for Production
+
+To create a production-ready zip file for distribution (e.g., for the Chrome Web Store):
+
+```bash
+npm run package
+```
+
+This command will:
+1. Run a full production build (minified and obfuscated)
+2. Verify the build for common issues
+3. Create a `extension-production.zip` file in the project root
 
 ### Project Structure
 
