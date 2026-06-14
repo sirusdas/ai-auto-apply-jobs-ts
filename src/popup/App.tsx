@@ -26,6 +26,13 @@ const App: React.FC = () => {
         <ul>
           <li>
             <button 
+              onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#ai-providers') })}
+            >
+              Full Settings
+            </button>
+          </li>
+          <li>
+            <button 
               className={activeTab === 'applied-jobs' ? 'active' : ''} 
               onClick={() => setActiveTab('applied-jobs')}
             >
