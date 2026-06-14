@@ -15,23 +15,41 @@ import { AIService } from '../utils/aiService';
 import { GeminiProvider } from '../utils/providers/geminiProvider';
 import { ClaudeProvider } from '../utils/providers/claudeProvider';
 import { OpenAIProvider } from '../utils/providers/openaiProvider';
-import { migrateToMultiAI } from '../utils/migration';
-import { AISettings } from '../types';
+import { migrateToMultiAI, migrateJobsToIndexedDB } from '../utils/migration';
+import { AISettings, AIProvider } from '../types';
 import * as tokenService from '../utils/tokenService';
+import { getAllJobs } from '../utils/indexedDB';
 
 const aiService = new AIService();
 
 async function initAIService() {
   await migrateToMultiAI();
+  await migrateJobsToIndexedDB();
   const result = await chrome.storage.local.get(['aiSettings']);
   const settings = result.aiSettings as AISettings;
 
   if (settings) {
-    settings.providers.forEach(p => {
+    settings.providers.forEach((p: AIProvider) => {
       if (p.id === 'gemini') aiService.registerProvider(new GeminiProvider(p));
       if (p.id === 'claude') aiService.registerProvider(new ClaudeProvider(p));
       if (p.id === 'openai') aiService.registerProvider(new OpenAIProvider(p));
     });
+  }
+}
+
+// Function to initialize job count from IndexedDB
+async function initJobCount() {
+  try {
+    const jobs = await getAllJobs();
+    const today = new Date().toISOString().split('T')[0];
+    const todaysJobs = jobs.filter(job => job.appliedDate && job.appliedDate.startsWith(today));
+    await chrome.storage.local.set({ jobCount: todaysJobs.length });
+    console.log(`Background: Initialized job count: ${todaysJobs.length} jobs for ${today} (Total in DB: ${jobs.length})`);
+    if (jobs.length > 0) {
+      console.log('Last 3 jobs in DB:', jobs.slice(0, 3).map(j => ({ id: j.id, date: j.appliedDate })));
+    }
+  } catch (error) {
+    console.error('Background: Error initializing job count:', error);
   }
 }
 
@@ -179,6 +197,7 @@ async function ensureTokenValid(): Promise<boolean> {
 
 initAIService();
 initTokenManagement();
+initJobCount();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
@@ -212,13 +231,52 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
     chrome.tabs.create({ url: chrome.runtime.getURL('settings.html#personal-info') });
   }
 
+  if (request.action === 'saveAppliedJob') {
+    const jobData = request.job;
+    console.log('Background: Received saveAppliedJob request for:', jobData.jobTitle);
+    
+    // Save to IndexedDB
+    import('../utils/indexedDB').then(({ saveJob, getAllJobs }) => {
+      saveJob(jobData).then(() => {
+        console.log('Background: Successfully saved job to IndexedDB');
+        
+        // Update job count
+        getAllJobs().then(jobs => {
+          const today = new Date().toISOString().split('T')[0];
+          const todaysJobs = jobs.filter(job => job.appliedDate && job.appliedDate.startsWith(today));
+          chrome.storage.local.set({ jobCount: todaysJobs.length });
+          console.log(`Background: Updated job count after save: ${todaysJobs.length} jobs for ${today}`);
+        }).catch(err => console.error('Error updating job count after save:', err));
+        
+      }).catch(err => {
+        console.error('Background: Error saving job to IndexedDB:', err);
+      });
+    }).catch(err => console.error('Failed to import indexedDB utils:', err));
+    
+    sendResponse({ success: true });
+    return true;
+  }
+
   if (request.action === 'updateJobCount') {
-    chrome.storage.local.get(['appliedJobs'], (result) => {
+    // Update job count by fetching from IndexedDB
+    getAllJobs().then(jobs => {
       const today = new Date().toISOString().split('T')[0];
-      const appliedJobs = result.appliedJobs || {};
-      const jobs = appliedJobs[today] || [];
-      chrome.storage.local.set({ jobCount: jobs.length });
+      console.log(`Background: updateJobCount called. Total jobs in DB: ${jobs.length}. Today: ${today}`);
+      
+      const todaysJobs = jobs.filter(job => {
+        const matches = !!(job.appliedDate && job.appliedDate.startsWith(today));
+        if (jobs.length < 10) {
+           console.log(`Job ${job.id}: appliedDate=${job.appliedDate}, matches today=${matches}`);
+        }
+        return matches;
+      });
+      
+      chrome.storage.local.set({ jobCount: todaysJobs.length });
+      console.log(`Updated job count: ${todaysJobs.length} jobs for ${today}`);
+    }).catch(error => {
+      console.error('Error updating job count:', error);
     });
+    return true;
   }
 
   if (request.action === 'checkJobMatch') {

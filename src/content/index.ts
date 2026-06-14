@@ -774,11 +774,8 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
 
 async function getDailyJobCount(): Promise<number> {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['appliedJobs'], (result) => {
-      const today = new Date().toISOString().split('T')[0];
-      const appliedJobs = result.appliedJobs || {};
-      const jobs = appliedJobs[today] || [];
-      resolve(jobs.length);
+    chrome.storage.local.get(['jobCount'], (result) => {
+      resolve(result.jobCount || 0);
     });
   });
 }
@@ -1234,12 +1231,12 @@ async function applyToJob(jobDetails: any) {
   try {
     console.log('Searching for Easy Apply buttons...');
     const buttons = Array.from(document.querySelectorAll('button'));
-    const easyApplyButtons = buttons.filter(b => b.innerText.includes('Easy Apply'));
+    const easyApplyButtons = buttons.filter(b => b.innerText.includes('Easy Apply') && !b.hasAttribute('disabled'));
 
-    console.log(`Found ${buttons.length} total buttons, ${easyApplyButtons.length} Easy Apply buttons`);
+    console.log(`Found ${buttons.length} total buttons, ${easyApplyButtons.length} enabled Easy Apply buttons`);
 
     if (easyApplyButtons.length > 0) {
-      console.log(`Found ${easyApplyButtons.length} Easy Apply buttons.`);
+      console.log(`Found ${easyApplyButtons.length} enabled Easy Apply buttons.`);
 
       // Prefer the one in the jobs details top card if possible
       let targetBtn = easyApplyButtons.find(b => b.closest('.job-details-jobs-unified-top-card'));
@@ -1248,13 +1245,20 @@ async function applyToJob(jobDetails: any) {
       if (!targetBtn) {
         // Filter for visible buttons
         const visibleButtons = easyApplyButtons.filter(b => b.offsetParent !== null);
-        console.log(`Found ${visibleButtons.length} visible Easy Apply buttons`);
+        console.log(`Found ${visibleButtons.length} visible enabled Easy Apply buttons`);
 
         if (visibleButtons.length > 0) {
-          // If multiple, picking the last one is often safer as the first might be the list item button?
-          // The reference said index 1 (second button).
-          targetBtn = visibleButtons.length > 1 ? visibleButtons[1] : visibleButtons[0];
-          console.log('Selected button index:', visibleButtons.indexOf(targetBtn));
+          // Prefer a button inside the details container if possible
+          const btnInDetails = visibleButtons.find(b => !!b.closest('.job-details-jobs-unified-top-card') || !!b.closest('.jobs-details__main-content'));
+          
+          if (btnInDetails) {
+            targetBtn = btnInDetails;
+            console.log('Selected button inside job details container');
+          } else {
+            // Fallback: Pick the last visible enabled button (often the best guess if multiple)
+            targetBtn = visibleButtons[visibleButtons.length - 1];
+            console.log('Selected last visible enabled button as fallback');
+          }
         }
       }
 

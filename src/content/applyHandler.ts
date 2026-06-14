@@ -1693,22 +1693,22 @@ export async function saveAppliedJob(jobDetails: any) {
     const exists = await jobExists(jobId);
 
     if (!exists) {
-        // Save job to IndexedDB with all required fields
-        await saveJob({
-            id: jobId,
-            jobTitle: jobDetails.jobTitle,
-            company: jobDetails.company,
-            location: jobDetails.location || '',
-            appliedDate: isoDate,
-            applicationFormData: applicationFormData || null,
-            archived: false,
-            createdAt: Date.now()
+        // Send message to background script to save job in extension's IndexedDB context
+        chrome.runtime.sendMessage({
+            action: 'saveAppliedJob',
+            job: {
+                id: jobId,
+                jobTitle: jobDetails.jobTitle,
+                company: jobDetails.company,
+                location: jobDetails.location || '',
+                appliedDate: isoDate,
+                applicationFormData: applicationFormData || null,
+                archived: 0,
+                createdAt: Date.now()
+            }
         });
 
-        // Also update a global count if needed
-        chrome.runtime.sendMessage({ action: 'updateJobCount' });
-
-        console.log(`Successfully saved job: ${jobDetails.jobTitle} at ${jobDetails.company}`);
+        console.log(`Successfully sent job to background for saving: ${jobDetails.jobTitle} at ${jobDetails.company}`);
     } else {
         console.log(`Job already exists: ${jobDetails.jobTitle} at ${jobDetails.company}`);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AI_MODELS, ModelInfo } from '../../constants/aiModels';
 import { fetchProviderModels } from '../../utils/modelFetcher';
+import { AIProvider } from '../../types';
 
 interface ModelSelectorProps {
     providerId: string;
@@ -48,7 +49,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
             const aiSettings = storedSettings.aiSettings;
             
             if (aiSettings && aiSettings.providers) {
-                const provider = aiSettings.providers.find(p => p.id === providerId);
+                const provider = aiSettings.providers.find((p: AIProvider) => p.id === providerId);
                 
                 if (provider && provider.apiKey) {
                     const models = await fetchProviderModels(providerId, provider.apiKey);

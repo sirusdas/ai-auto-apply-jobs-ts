@@ -5,7 +5,7 @@
 
 // Database configuration
 const DB_NAME = 'AppliedJobsDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'jobs';
 
 export interface AppliedJob {
@@ -15,7 +15,7 @@ export interface AppliedJob {
   location: string;
   appliedDate: string;
   applicationFormData?: any;
-  archived?: boolean;
+  archived?: number;       // 0 for false, 1 for true (booleans are not valid IDB keys)
   createdAt: number;       // timestamp for sorting/archiving
 }
 
@@ -85,6 +85,7 @@ function getTransaction(mode: IDBTransactionMode = 'readonly'): IDBTransaction {
 
 /**
  * Save a single job
+ * Waits for transaction completion to ensure data is committed
  */
 export function saveJob(job: AppliedJob): Promise<void> {
   return new Promise(async (resolve, reject) => {
@@ -94,15 +95,15 @@ export function saveJob(job: AppliedJob): Promise<void> {
       const transaction = getTransaction('readwrite');
       const store = transaction.objectStore(STORE_NAME);
 
-      const request = store.put(job);
+      store.put(job);
 
-      request.onsuccess = () => {
+      transaction.oncomplete = () => {
         resolve();
       };
 
-      request.onerror = () => {
-        console.error('Failed to save job:', request.error);
-        reject(request.error);
+      transaction.onerror = () => {
+        console.error('Transaction failed to save job:', transaction.error);
+        reject(transaction.error);
       };
     } catch (error) {
       reject(error);
@@ -112,6 +113,7 @@ export function saveJob(job: AppliedJob): Promise<void> {
 
 /**
  * Get all non-archived jobs
+ * More robust: Fetches all and filters in memory to avoid index issues
  */
 export function getAllJobs(): Promise<AppliedJob[]> {
   return new Promise(async (resolve, reject) => {
@@ -120,13 +122,12 @@ export function getAllJobs(): Promise<AppliedJob[]> {
       
       const transaction = getTransaction('readonly');
       const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('archived');
-      
-      // Get only non-archived jobs (archived = 0 or false)
-      const request = index.getAll(IDBKeyRange.only(0));
+      const request = store.getAll();
 
       request.onsuccess = () => {
-        const jobs = request.result as AppliedJob[];
+        const allJobs = request.result as AppliedJob[];
+        // Filter: non-archived (0 or undefined)
+        const jobs = allJobs.filter(job => !job.archived || job.archived === 0);
         // Sort by createdAt descending (newest first)
         jobs.sort((a, b) => b.createdAt - a.createdAt);
         resolve(jobs);
@@ -152,13 +153,12 @@ export function getArchivedJobs(): Promise<AppliedJob[]> {
       
       const transaction = getTransaction('readonly');
       const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('archived');
-      
-      // Get only archived jobs (archived = 1 or true)
-      const request = index.getAll(IDBKeyRange.only(1));
+      const request = store.getAll();
 
       request.onsuccess = () => {
-        const jobs = request.result as AppliedJob[];
+        const allJobs = request.result as AppliedJob[];
+        // Filter: only archived (1)
+        const jobs = allJobs.filter(job => job.archived === 1);
         // Sort by createdAt descending (newest first)
         jobs.sort((a, b) => b.createdAt - a.createdAt);
         resolve(jobs);
@@ -210,15 +210,15 @@ export function deleteJob(id: string): Promise<void> {
       
       const transaction = getTransaction('readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(id);
+      store.delete(id);
 
-      request.onsuccess = () => {
+      transaction.oncomplete = () => {
         resolve();
       };
 
-      request.onerror = () => {
-        console.error('Failed to delete job:', request.error);
-        reject(request.error);
+      transaction.onerror = () => {
+        console.error('Transaction failed to delete job:', transaction.error);
+        reject(transaction.error);
       };
     } catch (error) {
       reject(error);
@@ -256,16 +256,16 @@ export function updateJob(id: string, updates: Partial<AppliedJob>): Promise<voi
         };
         
         // Save the updated job
-        const putRequest = store.put(updatedJob);
-        
-        putRequest.onsuccess = () => {
-          resolve();
-        };
-        
-        putRequest.onerror = () => {
-          console.error('Failed to update job:', putRequest.error);
-          reject(putRequest.error);
-        };
+        store.put(updatedJob);
+      };
+
+      transaction.oncomplete = () => {
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        console.error('Transaction failed to update job:', transaction.error);
+        reject(transaction.error);
       };
       
       getRequest.onerror = () => {
@@ -280,7 +280,6 @@ export function updateJob(id: string, updates: Partial<AppliedJob>): Promise<voi
 
 /**
  * Calculate total storage size in bytes (approximate)
- * Note: IndexedDB doesn't provide direct size APIs, this is an estimate
  */
 export function getStorageSize(): Promise<number> {
   return new Promise(async (resolve, reject) => {
@@ -293,11 +292,8 @@ export function getStorageSize(): Promise<number> {
       
       request.onsuccess = () => {
         const jobs = request.result as AppliedJob[];
-        
-        // Estimate size by JSON stringification
         const jsonString = JSON.stringify(jobs);
         const size = new Blob([jsonString]).size;
-        
         resolve(size);
       };
       
@@ -313,8 +309,7 @@ export function getStorageSize(): Promise<number> {
 
 /**
  * Archive jobs older than N months
- * Sets archived = true for jobs older than the specified duration
- * Returns the count of archived jobs
+ * Sets archived = 1 for jobs older than the specified duration
  */
 export function archiveOldJobs(months: number): Promise<number> {
   return new Promise(async (resolve, reject) => {
@@ -325,58 +320,35 @@ export function archiveOldJobs(months: number): Promise<number> {
       cutoffDate.setMonth(cutoffDate.getMonth() - months);
       const cutoffTimestamp = cutoffDate.getTime();
       
-      const transaction = getTransaction('readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('createdAt');
-      
-      // Get all jobs created before the cutoff date
+      const readTransaction = getTransaction('readonly');
+      const readStore = readTransaction.objectStore(STORE_NAME);
+      const index = readStore.index('createdAt');
       const request = index.getAll(IDBKeyRange.upperBound(cutoffTimestamp));
       
-      let archivedCount = 0;
-      const jobsToArchive: AppliedJob[] = [];
-      
-      request.onsuccess = () => {
-        const jobs = request.result as AppliedJob[];
-        
-        // Mark each job as archived
-        jobs.forEach((job) => {
-          if (!job.archived) {
-            job.archived = true;
-            jobsToArchive.push(job);
-          }
-        });
+      request.onsuccess = async () => {
+        const jobsToArchive = (request.result as AppliedJob[]).filter(j => !j.archived || j.archived === 0);
         
         if (jobsToArchive.length === 0) {
           resolve(0);
           return;
         }
         
-        // Save updated jobs
-        const putTransaction = getTransaction('readwrite');
-        const putStore = putTransaction.objectStore(STORE_NAME);
+        const writeTransaction = getTransaction('readwrite');
+        const writeStore = writeTransaction.objectStore(STORE_NAME);
         
-        jobsToArchive.forEach((job) => {
-          const putRequest = putStore.put(job);
-          putRequest.onsuccess = () => {
-            archivedCount++;
-            if (archivedCount === jobsToArchive.length) {
-              resolve(archivedCount);
-            }
-          };
-          putRequest.onerror = () => {
-            console.error('Failed to archive job:', putRequest.error);
-          };
+        jobsToArchive.forEach(job => {
+          job.archived = 1;
+          writeStore.put(job);
         });
         
-        // Fallback timeout in case onsuccess doesn't fire for all
-        if (jobsToArchive.length === 0) {
-          resolve(0);
-        }
-      };
-      
-      request.onerror = () => {
-        console.error('Failed to get old jobs for archiving:', request.error);
-        reject(request.error);
+        writeTransaction.oncomplete = () => {
+          resolve(jobsToArchive.length);
+        };
+        
+        writeTransaction.onerror = () => {
+          console.error('Transaction failed to archive jobs:', writeTransaction.error);
+          reject(writeTransaction.error);
+        };
       };
     } catch (error) {
       reject(error);
@@ -386,7 +358,6 @@ export function archiveOldJobs(months: number): Promise<number> {
 
 /**
  * Permanently delete old jobs (both archived and non-archived)
- * Returns the count of deleted jobs
  */
 export function clearOldJobs(months: number): Promise<number> {
   return new Promise(async (resolve, reject) => {
@@ -397,48 +368,34 @@ export function clearOldJobs(months: number): Promise<number> {
       cutoffDate.setMonth(cutoffDate.getMonth() - months);
       const cutoffTimestamp = cutoffDate.getTime();
       
-      const transaction = getTransaction('readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('createdAt');
-      
-      // Get all jobs created before the cutoff date
+      const readTransaction = getTransaction('readonly');
+      const readStore = readTransaction.objectStore(STORE_NAME);
+      const index = readStore.index('createdAt');
       const request = index.getAllKeys(IDBKeyRange.upperBound(cutoffTimestamp));
       
-      let deletedCount = 0;
-      const idsToDelete: string[] = [];
-      
       request.onsuccess = () => {
-        const keys = request.result as string[];
-        idsToDelete.push(...keys);
+        const keysToDelete = request.result as string[];
         
-        if (idsToDelete.length === 0) {
+        if (keysToDelete.length === 0) {
           resolve(0);
           return;
         }
         
-        // Delete each job
-        idsToDelete.forEach((id) => {
-          const deleteRequest = store.delete(id);
-          deleteRequest.onsuccess = () => {
-            deletedCount++;
-            if (deletedCount === idsToDelete.length) {
-              resolve(deletedCount);
-            }
-          };
-          deleteRequest.onerror = () => {
-            console.error('Failed to delete job:', deleteRequest.error);
-          };
+        const writeTransaction = getTransaction('readwrite');
+        const writeStore = writeTransaction.objectStore(STORE_NAME);
+        
+        keysToDelete.forEach(id => {
+          writeStore.delete(id);
         });
         
-        // Fallback timeout
-        if (idsToDelete.length === 0) {
-          resolve(0);
-        }
-      };
-      
-      request.onerror = () => {
-        console.error('Failed to get old jobs for deletion:', request.error);
-        reject(request.error);
+        writeTransaction.oncomplete = () => {
+          resolve(keysToDelete.length);
+        };
+        
+        writeTransaction.onerror = () => {
+          console.error('Transaction failed to clear old jobs:', writeTransaction.error);
+          reject(writeTransaction.error);
+        };
       };
     } catch (error) {
       reject(error);
@@ -448,24 +405,16 @@ export function clearOldJobs(months: number): Promise<number> {
 
 /**
  * Import from chrome.storage.local format
- * Expected format: { "2026-02-08": [{ jobTitle, company, location, appliedDate, applicationFormData }] }
- * Returns the count of imported jobs
  */
 export function migrateFromChromeStorage(data: ChromeStorageFormat): Promise<number> {
   return new Promise(async (resolve, reject) => {
     try {
       await initDB();
       
-      let importedCount = 0;
       const jobsToImport: AppliedJob[] = [];
-      
-      // Process each date in the chrome storage data
       for (const [date, jobs] of Object.entries(data)) {
         for (const job of jobs) {
-          // Create unique ID from company and applied date
           const id = `${job.company}-${job.appliedDate}`;
-          
-          // Determine createdAt from appliedDate
           const appliedDateObj = new Date(job.appliedDate);
           const createdAt = appliedDateObj.getTime();
           
@@ -476,7 +425,7 @@ export function migrateFromChromeStorage(data: ChromeStorageFormat): Promise<num
             location: job.location,
             appliedDate: job.appliedDate,
             applicationFormData: job.applicationFormData,
-            archived: false,
+            archived: 0,
             createdAt
           });
         }
@@ -487,27 +436,21 @@ export function migrateFromChromeStorage(data: ChromeStorageFormat): Promise<num
         return;
       }
       
-      // Use transaction to bulk add all jobs
       const transaction = getTransaction('readwrite');
       const store = transaction.objectStore(STORE_NAME);
       
-      jobsToImport.forEach((job) => {
-        const request = store.put(job);
-        request.onsuccess = () => {
-          importedCount++;
-          if (importedCount === jobsToImport.length) {
-            resolve(importedCount);
-          }
-        };
-        request.onerror = () => {
-          console.error('Failed to import job:', request.error);
-        };
+      jobsToImport.forEach(job => {
+        store.put(job);
       });
       
-      // Fallback timeout
-      if (jobsToImport.length === 0) {
-        resolve(0);
-      }
+      transaction.oncomplete = () => {
+        resolve(jobsToImport.length);
+      };
+      
+      transaction.onerror = () => {
+        console.error('Transaction failed to migrate jobs:', transaction.error);
+        reject(transaction.error);
+      };
     } catch (error) {
       reject(error);
     }
@@ -515,24 +458,23 @@ export function migrateFromChromeStorage(data: ChromeStorageFormat): Promise<num
 }
 
 /**
- * Clear all jobs (for migration/reset)
+ * Clear all jobs
  */
 export function clearAllJobs(): Promise<void> {
   return new Promise(async (resolve, reject) => {
     try {
       await initDB();
-      
       const transaction = getTransaction('readwrite');
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.clear();
+      store.clear();
       
-      request.onsuccess = () => {
+      transaction.oncomplete = () => {
         resolve();
       };
       
-      request.onerror = () => {
-        console.error('Failed to clear all jobs:', request.error);
-        reject(request.error);
+      transaction.onerror = () => {
+        console.error('Transaction failed to clear all jobs:', transaction.error);
+        reject(transaction.error);
       };
     } catch (error) {
       reject(error);
@@ -547,19 +489,11 @@ export function getJobCount(): Promise<number> {
   return new Promise(async (resolve, reject) => {
     try {
       await initDB();
-      
       const transaction = getTransaction('readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.count();
-      
-      request.onsuccess = () => {
-        resolve(request.result);
-      };
-      
-      request.onerror = () => {
-        console.error('Failed to get job count:', request.error);
-        reject(request.error);
-      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
     } catch (error) {
       reject(error);
     }
@@ -573,19 +507,11 @@ export function jobExists(id: string): Promise<boolean> {
   return new Promise(async (resolve, reject) => {
     try {
       await initDB();
-      
       const transaction = getTransaction('readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.getKey(id);
-      
-      request.onsuccess = () => {
-        resolve(request.result !== undefined);
-      };
-      
-      request.onerror = () => {
-        console.error('Failed to check if job exists:', request.error);
-        reject(request.error);
-      };
+      request.onsuccess = () => resolve(request.result !== undefined);
+      request.onerror = () => reject(request.error);
     } catch (error) {
       reject(error);
     }

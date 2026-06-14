@@ -202,8 +202,6 @@ export async function shouldValidate(): Promise<boolean> {
                 }
                 resolve(true); // Validation is required
             } else {
-                const nextValidationDate = new Date(nextValidationTimestamp);
-                console.log(`Token validation: Next validation scheduled for ${nextValidationDate.toString()}`);
                 resolve(false); // Use cached data
             }
         });
