@@ -990,6 +990,16 @@ async function scrollAndFetchAllJobs(): Promise<{ listItems: HTMLElement[], jobD
     const jobTitle = titleEl?.textContent?.trim() || '';
     const company = companyEl?.textContent?.trim() || '';
 
+    // Check if job is already applied or viewed
+    const statusElement = item.querySelector('.job-card-container__footer-job-state, .job-card-list__footer-wrapper');
+    const statusText = statusElement?.textContent?.toLowerCase() || '';
+    const isAppliedOrViewed = statusText.includes('applied') || statusText.includes('viewed');
+
+    if (isAppliedOrViewed) {
+      console.log(`Skipped job (already applied/viewed): ${jobTitle || 'Unknown'} at ${company || 'Unknown'}`);
+      continue;
+    }
+
     if (jobTitle && company) {
       jobDetails.push({ listItem: item, jobTitle, company });
       listItems.push(item as HTMLElement);
@@ -1143,10 +1153,10 @@ async function runAutoApplyProcess(myLoopId: number) {
   if (myLoopId !== currentLoopId) return;
 
   if (allJobs.length === 0) {
-    console.log('No jobs found. Waiting...');
+    console.log('No valid actionable jobs found on this page (they may have been skipped). Navigating to next page...');
     await addDelay();
     if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
-      requestAnimationFrame(() => runAutoApplyProcess(myLoopId));
+      await goToNextPage(myLoopId);
     }
     return;
   }
@@ -1195,16 +1205,29 @@ async function runAutoApplyProcess(myLoopId: number) {
 }
 
 async function goToNextPage(myLoopId: number) {
-  const nextButton = document.querySelector('.jobs-search-pagination__button--next') as HTMLElement;
-  if (nextButton) {
+  // Use multiple fallback selectors for the "Next" button based on LinkedIn's HTML structure
+  const nextButton = document.querySelector(
+    '.jobs-search-pagination__button--next, button[aria-label="View next page"], button.artdeco-pagination__button--next'
+  ) as HTMLButtonElement;
+
+  if (nextButton && !nextButton.disabled && !nextButton.classList.contains('disabled')) {
     console.log('Navigating to next page...');
+    
+    // Scroll the button into view to ensure any intersection observers trigger and it's clickable
+    nextButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await addVeryShortDelay(); // Give it a moment to scroll
+    
     nextButton.click();
+    
+    // Wait for the next page to load
     await addDelay();
+    await addDelay(); // Adding a bit of extra delay for network requests
+    
     if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
       runAutoApplyProcess(myLoopId);
     }
   } else {
-    console.log('No next page found.');
+    console.log('No next page found or button is disabled. Moving to next segment...');
     if (currentState) {
       moveToNextSegment(currentState, currentState.configs);
     } else {
