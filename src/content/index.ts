@@ -59,6 +59,7 @@ let settingsButton: HTMLButtonElement | null = null;
 let timerInterval: number | null = null;
 let segmentTimeout: number | null = null;
 let currentState: AutoApplyState | null = null;
+let currentLoopId: number = 0;
 
 // Helper to parse timer string (e.g. "10", "10m", "10 min", "1h") to milliseconds
 function parseTimerToMs(timerStr: string): number {
@@ -393,34 +394,51 @@ async function resumeAutoApplyProcess(state: AutoApplyState) {
   processCurrentSegment(state, configs);
 }
 
+// Helper to get sanitized/valid arrays from a config, ignoring blank entries
+function getValidArrays(jobConfig: JobConfig) {
+  if (!jobConfig) return { locations: [], jobTypes: [], workplaceTypes: [] };
+
+  const validLocations = jobConfig.locations ? jobConfig.locations.filter(l => (l.locationName || '').trim() !== '' || (l.locationTimer || '').trim() !== '') : [];
+  const locations = validLocations.length > 0 ? validLocations : [{ locationName: '', locationTimer: '' }];
+
+  const validJobTypes = jobConfig.jobTypes ? jobConfig.jobTypes.filter(jt => (jt.jobTypeName || '').trim() !== '' || (jt.jobTypeTimer || '').trim() !== '') : [];
+  const jobTypes = validJobTypes.length > 0 ? validJobTypes : [{ jobTypeName: '', jobTypeTimer: '' }];
+
+  const validWorkplaceTypes = jobConfig.workplaceTypes ? jobConfig.workplaceTypes.filter(wt => (wt.workplaceTypeName || '').trim() !== '' || (wt.workplaceTypeTimer || '').trim() !== '') : [];
+  const workplaceTypes = validWorkplaceTypes.length > 0 ? validWorkplaceTypes : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
+
+  return { locations, jobTypes, workplaceTypes };
+}
+
 function calculateSegmentDuration(configs: JobConfig[], jIdx: number, lIdx: number, tIdx: number, wIdx: number): number {
   const jobConfig = configs[jIdx];
   if (!jobConfig) return 5 * 60 * 1000; // default safe fallback
 
   const defaultDuration = 10 * 60 * 1000; // 10 mins default
+  const { locations, jobTypes, workplaceTypes } = getValidArrays(jobConfig);
 
   // Hierarchy (Most specific to least specific): Location > Job Type > Workplace Type > Job Config
   let timerStr = '';
 
   // 1. Check if locations are present and valid
-  const hasLocations = jobConfig.locations && jobConfig.locations.some(l => l.locationName || l.locationTimer);
-  if (hasLocations && jobConfig.locations[lIdx]) {
-    timerStr = jobConfig.locations[lIdx].locationTimer;
+  const hasLocations = locations.length > 1 || locations[0].locationName !== '' || locations[0].locationTimer !== '';
+  if (hasLocations && locations[lIdx]) {
+    timerStr = locations[lIdx].locationTimer;
   }
 
   // 2. If no location timer, check job types
   if (!timerStr) {
-    const hasJobTypes = jobConfig.jobTypes && jobConfig.jobTypes.some(jt => jt.jobTypeName || jt.jobTypeTimer);
-    if (hasJobTypes && jobConfig.jobTypes[tIdx]) {
-      timerStr = jobConfig.jobTypes[tIdx].jobTypeTimer;
+    const hasJobTypes = jobTypes.length > 1 || jobTypes[0].jobTypeName !== '' || jobTypes[0].jobTypeTimer !== '';
+    if (hasJobTypes && jobTypes[tIdx]) {
+      timerStr = jobTypes[tIdx].jobTypeTimer;
     }
   }
 
   // 3. If still no timer, check workplace types
   if (!timerStr) {
-    const hasWorkplaceTypes = jobConfig.workplaceTypes && jobConfig.workplaceTypes.some(wt => wt.workplaceTypeName || wt.workplaceTypeTimer);
-    if (hasWorkplaceTypes && jobConfig.workplaceTypes[wIdx]) {
-      timerStr = jobConfig.workplaceTypes[wIdx].workplaceTypeTimer;
+    const hasWorkplaceTypes = workplaceTypes.length > 1 || workplaceTypes[0].workplaceTypeName !== '' || workplaceTypes[0].workplaceTypeTimer !== '';
+    if (hasWorkplaceTypes && workplaceTypes[wIdx]) {
+      timerStr = workplaceTypes[wIdx].workplaceTypeTimer;
     }
   }
 
@@ -442,45 +460,27 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
   }
 
   const jobConfig = configs[state.jobIndex];
-
-  // Handle empty locations/types by treating them as a single item array of "any"
-  const locations = (jobConfig.locations && jobConfig.locations.length > 0)
-    ? jobConfig.locations
-    : [{ locationName: '', locationTimer: '' }];
-
-  const jobTypes = (jobConfig.jobTypes && jobConfig.jobTypes.length > 0)
-    ? jobConfig.jobTypes
-    : [{ jobTypeName: '', jobTypeTimer: '' }];
-
-  const workplaceTypes = (jobConfig.workplaceTypes && jobConfig.workplaceTypes.length > 0)
-    ? jobConfig.workplaceTypes
-    : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
-
-  if (state.locationIndex >= locations.length) {
-    // Move to next job config
-    state.jobIndex++;
-    state.locationIndex = 0;
-    state.typeIndex = 0;
-    state.workplaceIndex = 0;
-    saveState(state);
-    processCurrentSegment(state, configs);
-    return;
-  }
+  const { locations, jobTypes, workplaceTypes } = getValidArrays(jobConfig);
 
   if (state.workplaceIndex >= workplaceTypes.length) {
-    // Move to next location
-    state.locationIndex++;
+    state.typeIndex++;
     state.workplaceIndex = 0;
-    state.typeIndex = 0;
     saveState(state);
     processCurrentSegment(state, configs);
     return;
   }
 
   if (state.typeIndex >= jobTypes.length) {
-    // Move to next workplace type
-    state.workplaceIndex++;
+    state.locationIndex++;
     state.typeIndex = 0;
+    saveState(state);
+    processCurrentSegment(state, configs);
+    return;
+  }
+
+  if (state.locationIndex >= locations.length) {
+    state.jobIndex++;
+    state.locationIndex = 0;
     saveState(state);
     processCurrentSegment(state, configs);
     return;
@@ -507,12 +507,26 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
       window.location.href = targetUrl;
     }
     return;
+  } else {
+    // If URL matches exactly, but we just transitioned to a new segment (startTime is very recent),
+    // force a page reload to ensure we start scraping from the top of the new segment.
+    const now = Date.now();
+    if (now - state.startTime < 2000 && !sessionStorage.getItem(RELOAD_KEY + '_flag')) {
+      console.log('Segment transitioned to identical URL configuration. Forcing page reload to reset search.');
+      sessionStorage.setItem(RELOAD_KEY + '_flag', 'true');
+      window.location.reload();
+      return;
+    }
   }
 
 
   // We are on the correct page. Start Logic.
   showLoadingState();
   createControlButtons();
+
+  // Increment loop ID to stop any previous overlapping loops
+  currentLoopId++;
+  const myLoopId = currentLoopId;
 
   // Calculate remaining time
   const now = Date.now();
@@ -533,7 +547,7 @@ function processCurrentSegment(state: AutoApplyState, configs: JobConfig[]) {
   segmentTimeout = window.setTimeout(() => moveToNextSegment(state, configs), remaining);
 
   // Start the actual applying loop
-  runAutoApplyProcess();
+  runAutoApplyProcess(myLoopId);
 }
 
 // Function to check if current URL has correct parameters and fix if needed
@@ -659,49 +673,35 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
   }
 
   // Check if essential parameters match
-  const essentialKeys = ['keywords', 'location', 'f_AL', 'sortBy'];
+  const essentialKeys = ['keywords', 'location', 'f_AL', 'sortBy', 'f_JT', 'f_WT'];
 
   for (const key of essentialKeys) {
     const targetVal = target.searchParams.get(key);
     const currentVal = currentUrl.searchParams.get(key);
+    
     console.log(`Comparing param "${key}": target="${targetVal}", current="${currentVal}"`);
 
-    // Normalize null/empty
+    // Normalize null/empty string to just empty string for comparison
     const t = (targetVal || '').toLowerCase().trim();
     const c = (currentVal || '').toLowerCase().trim();
 
     if (t !== c) {
+      console.log(`Mismatch found on "${key}": target wants "${t}", but url has "${c}"`);
       return false;
     }
   }
-
-  // Check workplace type only if specified in config
-  // const targetWT = target.searchParams.get('f_WT') || '';
-  // const currentWT = currentUrl.searchParams.get('f_WT') || '';
-  // if (targetWT !== '' && targetWT !== currentWT) {
-  //   return false;
-  // }
-
-  // Check job type only if specified in config
-  // const targetJT = target.searchParams.get('f_JT') || '';
-  // const currentJT = currentUrl.searchParams.get('f_JT') || '';
-  // if (targetJT !== '' && targetJT !== currentJT) {
-  //   return false;
-  // }
 
   return true;
 }
 
 function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
   // Move to the next segment in the sequence:
-  // 1. Next job type within current location
-  // 2. Next location within current job config
-  // 3. Next job config
+  // Hierarchy (Inner to Outer): Workplace Type -> Job Type -> Location -> Job Config
   console.log('Moving to next segment...');
   // We are on the correct page, so clear any reload loop detection.
   sessionStorage.removeItem(RELOAD_KEY);
 
-  // Get current job config to access locations and job types
+  // Get current job config to access arrays
   const jobConfig = configs[state.jobIndex];
   const locations = (jobConfig.locations && jobConfig.locations.length > 0)
     ? jobConfig.locations
@@ -715,23 +715,23 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
     ? jobConfig.workplaceTypes
     : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
 
-  // Increment location index first (Inner loop)
-  state.locationIndex++;
+  // Increment Workplace Type index first (Innermost loop)
+  state.workplaceIndex++;
 
-  // If we've exhausted all locations, move to next job type
-  if (state.locationIndex >= locations.length) {
+  // If we've exhausted all workplace types, move to next job type
+  if (state.workplaceIndex >= workplaceTypes.length) {
     state.typeIndex++;
-    state.locationIndex = 0;
+    state.workplaceIndex = 0;
 
-    // If we've exhausted all job types, move to next workplace type
+    // If we've exhausted all job types, move to next location
     if (state.typeIndex >= jobTypes.length) {
-      state.workplaceIndex++;
+      state.locationIndex++;
       state.typeIndex = 0;
 
-      // If we've exhausted all workplace types, move to next job config
-      if (state.workplaceIndex >= workplaceTypes.length) {
+      // If we've exhausted all locations, move to next job config
+      if (state.locationIndex >= locations.length) {
         state.jobIndex++;
-        state.workplaceIndex = 0;
+        state.locationIndex = 0;
       }
     }
   }
@@ -746,6 +746,9 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
 
   // If we still have more segments, process them
   if (state.jobIndex < configs.length) {
+    const nextConfig = configs[state.jobIndex];
+    const locName = (nextConfig.locations && nextConfig.locations[state.locationIndex]?.locationName) || 'Default Location';
+    showToast(`Moving to next search segment: ${nextConfig.jobTitleName} in ${locName}`, 'info');
     processCurrentSegment(state, configs);
   } else {
     // All done with current cycle
@@ -1015,24 +1018,35 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
 
   try {
     const response: any = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
-        action: 'filterCompanies',
-        companies,
-        token: token // Updated param name to match background expected input if needed
-      }, (res) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (res && res.success) {
-          resolve(res.data);
-        } else {
-          const errorMsg = res?.error || 'AI service returned failure';
-          console.error('AI Company Filter Failed:', errorMsg);
-          // Instead of continuing blindly, alert the user
-          alert(`AI Service Error (Company Filter): ${errorMsg}\n\nPlease check your API key/model settings or contact support: tools.qerds@gmail.com`);
-          stopAutoApplyProcess();
-          resolve(null);
-        }
-      });
+      const sendAction = () => {
+        chrome.runtime.sendMessage({
+          action: 'filterCompanies',
+          companies,
+          token: token // Updated param name to match background expected input if needed
+        }, (res) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (res && res.success) {
+            resolve(res.data);
+          } else if (res && res.error === 'AI_COOLDOWN' && !res.stop) {
+            const retryAfter = res.retryAfter || 900000;
+            const attempt = res.retryCount || 1;
+            
+            showToast(`AI Rate Limit (Filter) (Attempt ${attempt}/3). Waiting 15 mins...`, 'warning');
+            console.log(`AI Cooldown (Filter) detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+            
+            setTimeout(sendAction, retryAfter);
+          } else {
+            const errorMsg = res?.error || 'AI service returned failure';
+            console.error('AI Company Filter Failed:', errorMsg);
+            // Instead of continuing blindly, alert the user
+            alert(`AI Service Error (Company Filter): ${errorMsg}\n\nPlease check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
+            stopAutoApplyProcess();
+            resolve(null);
+          }
+        });
+      };
+      sendAction();
     });
 
     if (response === null) {
@@ -1068,8 +1082,12 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
   }
 }
 
-async function runAutoApplyProcess() {
+async function runAutoApplyProcess(myLoopId: number) {
   if (!currentState || !currentState.isRunning || currentState.isPaused) return;
+  if (myLoopId !== currentLoopId) {
+    console.log(`Stopping old loop (ID: ${myLoopId}) because a new one (ID: ${currentLoopId}) started.`);
+    return;
+  }
 
   // Verify URL matching (Strict enforcement of f_AL=true and other mandatory filters)
   const jobConfig = currentState.configs[currentState.jobIndex];
@@ -1107,24 +1125,33 @@ async function runAutoApplyProcess() {
   // 1. Scroll and Batch Fetch
   const { jobDetails: allJobs } = await scrollAndFetchAllJobs();
 
+  if (myLoopId !== currentLoopId) return;
+
   if (allJobs.length === 0) {
     console.log('No jobs found. Waiting...');
     await addDelay();
-    if (currentState && currentState.isRunning) {
-      requestAnimationFrame(runAutoApplyProcess);
+    if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
+      requestAnimationFrame(() => runAutoApplyProcess(myLoopId));
     }
     return;
   }
 
   // 2. Filter by Company Type
   const filteredJobs = await filterJobsByCompanyType(allJobs);
+  
+  if (myLoopId !== currentLoopId) return;
+  
   console.log(`Filtered down to ${filteredJobs.length} jobs from ${allJobs.length}`);
 
-  // 3. Apply Loop
   // 3. Apply Loop
   console.log(`Starting processing of ${filteredJobs.length} jobs...`);
 
   for (let i = 0; i < filteredJobs.length; i++) {
+    if (myLoopId !== currentLoopId) {
+      console.log(`Loop ID changed from ${myLoopId} to ${currentLoopId}. Breaking old loop.`);
+      break;
+    }
+
     const job = filteredJobs[i];
 
     if (!currentState || !currentState.isRunning) {
@@ -1135,29 +1162,31 @@ async function runAutoApplyProcess() {
     while (currentState && currentState.isPaused) {
       console.log('Paused. Waiting...');
       await new Promise(r => setTimeout(r, 1000));
-      if (!currentState || !currentState.isRunning) break;
+      if (!currentState || !currentState.isRunning || myLoopId !== currentLoopId) break;
     }
 
-    if (!currentState || !currentState.isRunning) break;
+    if (!currentState || !currentState.isRunning || myLoopId !== currentLoopId) break;
 
     await processSingleJob(job, i, filteredJobs.length);
     await addShortDelay();
   }
 
+  if (myLoopId !== currentLoopId) return;
+
   console.log('Finished current batch. Waiting/Reloading...');
   // Logic to go to next page?
   // User ref code had `goToNextPage`
-  await goToNextPage();
+  await goToNextPage(myLoopId);
 }
 
-async function goToNextPage() {
+async function goToNextPage(myLoopId: number) {
   const nextButton = document.querySelector('.jobs-search-pagination__button--next') as HTMLElement;
   if (nextButton) {
     console.log('Navigating to next page...');
     nextButton.click();
     await addDelay();
-    if (currentState && currentState.isRunning) {
-      runAutoApplyProcess();
+    if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
+      runAutoApplyProcess(myLoopId);
     }
   } else {
     console.log('No next page found.');
@@ -1198,27 +1227,38 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
 
   try {
     const response: any = await new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        {
-          action: 'checkJobMatch',
-          jobDetails,
-          resume
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (response && response.success) {
-            resolve(response.data);
-          } else {
-            const errorMsg = response?.error || 'AI service returned failure';
-            console.error('AI Service Failed:', errorMsg);
-            // Instead of continuing blindly, alert the user as requested
-            alert(`AI Service Issue: The AI service is having trouble. Please check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
-            stopAutoApplyProcess();
-            resolve(null);
+      const sendAction = () => {
+        chrome.runtime.sendMessage(
+          {
+            action: 'checkJobMatch',
+            jobDetails,
+            resume
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else if (response && response.success) {
+              resolve(response.data);
+            } else if (response && response.error === 'AI_COOLDOWN' && !response.stop) {
+              const retryAfter = response.retryAfter || 900000;
+              const attempt = response.retryCount || 1;
+              
+              showToast(`AI Rate Limit detected (Attempt ${attempt}/3). Taking a 15-minute break. Do not close this tab.`, 'warning');
+              console.log(`AI Cooldown detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+              
+              setTimeout(sendAction, retryAfter);
+            } else {
+              const errorMsg = response?.error || 'AI service returned failure';
+              console.error('AI Service Failed:', errorMsg);
+              // Instead of continuing blindly, alert the user as requested
+              alert(`AI Service Issue: ${errorMsg}. The extension has been stopped to prevent further errors.`);
+              stopAutoApplyProcess();
+              resolve(null);
+            }
           }
-        }
-      );
+        );
+      };
+      sendAction();
     });
 
     // If we received null (service failure), return false to stop processing this job

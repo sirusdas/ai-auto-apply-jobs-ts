@@ -158,6 +158,60 @@ async function stopExtension(reason: string) {
   });
 }
 
+function extractJSON(text: string): string {
+  // 1. Try to find a markdown code block
+  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```([\s\S]*?)```/);
+  if (jsonMatch && jsonMatch[1]) {
+    return jsonMatch[1].trim();
+  }
+
+  // 2. Try to find the first '{' and last '}'
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  
+  if (start !== -1 && end !== -1 && end > start) {
+    return text.substring(start, end + 1).trim();
+  }
+
+  // 3. Last resort: clean up markdown tokens and trim
+  return text.replace(/```json/g, '').replace(/```/g, '').trim();
+}
+
+async function handleAIError(error: any): Promise<{ isRetryable: boolean; retryCount: number; stop: boolean; waitTime: number }> {
+  const result = await chrome.storage.local.get(['aiRetryCount']);
+  const aiRetryCount = result.aiRetryCount || 0;
+  
+  // Check if it's a rate limit error or a parsing error
+  const isRateLimit = error.message === 'RATE_LIMIT_COOLDOWN' || 
+                     error.message.includes('429') || 
+                     error.message.toLowerCase().includes('rate limit');
+  const isParsingError = error.message.includes('Failed to parse AI response');
+  
+  const isRetryable = isRateLimit || isParsingError;
+
+  if (isRetryable) {
+    if (aiRetryCount < 3) {
+      const newCount = aiRetryCount + 1;
+      await chrome.storage.local.set({ aiRetryCount: newCount });
+      
+      // For rate limits, wait 15 mins. For parsing errors, wait 30 seconds (or 15 mins if user insists on "any error")
+      // The user said: "we need to just take a break for 15 min and then try again"
+      // So I will stick to 15 mins for both to be safe as per user's request for "any failure".
+      const waitTime = 15 * 60 * 1000;
+      
+      console.log(`AI Error detected (${error.message}). Attempt ${newCount}/3. Waiting 15 minutes.`);
+      return { isRetryable: true, retryCount: newCount, stop: false, waitTime };
+    } else {
+      console.error(`AI Error limit reached (3 attempts). Error: ${error.message}. Stopping extension.`);
+      await chrome.storage.local.remove(['aiRetryCount']);
+      await stopExtension(`AI service is persistently failing after 3 attempts. Last error: ${error.message}. Please check your settings or try again in 30 minutes.`);
+      return { isRetryable: true, retryCount: aiRetryCount, stop: true, waitTime: 0 };
+    }
+  }
+  
+  return { isRetryable: false, retryCount: 0, stop: false, waitTime: 0 };
+}
+
 async function ensureTokenValid(): Promise<boolean> {
   const tokenData = await tokenService.getTokenData();
   if (!tokenData) return false;
@@ -289,10 +343,21 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         .then((data) => {
           sendResponse({ success: true, data });
         })
-        .catch((error) => {
+        .catch(async (error) => {
           console.error('Error in checkJobMatch:', error);
-          notifyAIFailure(error);
-          sendResponse({ success: false, error: error.message || 'Unknown error' });
+          const errorStatus = await handleAIError(error);
+          if (errorStatus.isRetryable) {
+            sendResponse({ 
+              success: false, 
+              error: 'AI_COOLDOWN', 
+              retryCount: errorStatus.retryCount,
+              retryAfter: errorStatus.waitTime,
+              stop: errorStatus.stop
+            });
+          } else {
+            notifyAIFailure(error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          }
         });
     });
     return true; // Keep channel open
@@ -326,10 +391,21 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         .then((data) => {
           sendResponse({ success: true, data });
         })
-        .catch((error) => {
+        .catch(async (error) => {
           console.error('Error in answerJobQuestions:', error);
-          notifyAIFailure(error);
-          sendResponse({ success: false, error: error.message || 'Unknown error' });
+          const errorStatus = await handleAIError(error);
+          if (errorStatus.isRetryable) {
+            sendResponse({ 
+              success: false, 
+              error: 'AI_COOLDOWN', 
+              retryCount: errorStatus.retryCount,
+              retryAfter: errorStatus.waitTime,
+              stop: errorStatus.stop
+            });
+          } else {
+            notifyAIFailure(error);
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          }
         });
     });
     return true; // Keep channel open
@@ -357,9 +433,20 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         .then((data) => {
           sendResponse({ success: true, data });
         })
-        .catch((error) => {
+        .catch(async (error) => {
           console.error('Error in filterCompanies:', error);
-          sendResponse({ success: false, error: error.message || 'Unknown error' });
+          const errorStatus = await handleAIError(error);
+          if (errorStatus.isRetryable) {
+            sendResponse({ 
+              success: false, 
+              error: 'AI_COOLDOWN', 
+              retryCount: errorStatus.retryCount,
+              retryAfter: errorStatus.waitTime,
+              stop: errorStatus.stop
+            });
+          } else {
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          }
         });
     });
     return true;
@@ -386,9 +473,20 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         .then((response) => {
           sendResponse({ success: true, data: response });
         })
-        .catch((error) => {
+        .catch(async (error) => {
           console.error('Error in generateResume:', error);
-          sendResponse({ success: false, error: error.message || 'Unknown error' });
+          const errorStatus = await handleAIError(error);
+          if (errorStatus.isRetryable) {
+            sendResponse({ 
+              success: false, 
+              error: 'AI_COOLDOWN', 
+              retryCount: errorStatus.retryCount,
+              retryAfter: errorStatus.waitTime,
+              stop: errorStatus.stop
+            });
+          } else {
+            sendResponse({ success: false, error: error.message || 'Unknown error' });
+          }
         });
     });
     return true;
@@ -440,27 +538,25 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 async function handleCompanyFiltering(companies: string[]): Promise<{ product_companies: any[], service_companies: any[] }> {
-  const promptText = 'Find the company category(product based or service based also mention their industries and add a parameter is_it as (true or false, based on IT or non-IT) and output as {"product_companies": [{"company_name":"","industry":"", is_it: true}], "service_companies": [...]} for the below companies: ' + JSON.stringify(companies);
+  const promptText = 'IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. Find the company category(product based or service based also mention their industries and add a parameter is_it as (true or false, based on IT or non-IT) and output as {"product_companies": [{"company_name":"","industry":"", is_it: true}], "service_companies": [...]} for the below companies: ' + JSON.stringify(companies);
 
   const response = await aiService.sendRequest({ prompt: promptText });
   const contentText = response.content;
 
-  // Extract JSON
-  const jsonMatch = contentText.match(/```json\n([\s\S]*?)\n```/);
-  const jsonString = jsonMatch ? jsonMatch[1] : contentText.replace(/```json/g, '').replace(/```/g, '').trim();
+  const jsonString = extractJSON(contentText);
 
   try {
     return JSON.parse(jsonString);
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to parse company filter JSON', e);
-    return { product_companies: [], service_companies: [] };
+    throw new Error("Failed to parse AI response: " + e.message);
   }
 }
 
 
 async function handleJobMatch(jobDetails: any, resume: string): Promise<any> {
   // Construct the prompt
-  const promptText = 'As per resume and jd provided Also note: company must be primary product based company(IT, non-IT) or non-IT based service companies only. Output as {"company_name":"","company_type":"service/product", "industry":"IT/Non-IT","match_score":0} note match_score based on [1. Average Match, 2. Above average, 3. Good, 4. Excellent, 5. Outstanding]. Resume: ' + resume + " JD: Title:" + jobDetails.jobTitle + " Desc: " + jobDetails.description + " Company: " + jobDetails.company;
+  const promptText = 'IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. As per resume and jd provided Also note: company must be primary product based company(IT, non-IT) or non-IT based service companies only. Output as {"company_name":"","company_type":"service/product", "industry":"IT/Non-IT","match_score":0} note match_score based on [1. Average Match, 2. Above average, 3. Good, 4. Excellent, 5. Outstanding]. Resume: ' + resume + " JD: Title:" + jobDetails.jobTitle + " Desc: " + jobDetails.description + " Company: " + jobDetails.company;
 
   console.log('Sending request to AI Service...');
 
@@ -473,17 +569,7 @@ async function handleJobMatch(jobDetails: any, resume: string): Promise<any> {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   try {
-    // Extract JSON from markdown block if present
-    const jsonMatch = contentText.match(/```json\n([\s\S]*?)\n```/);
-    let jsonString = '';
-
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    } else {
-      // Clean up potential markdown formatting if regex didn't match perfectly
-      jsonString = contentText.replace(/```json/g, '').replace(/```/g, '').trim();
-    }
-
+    const jsonString = extractJSON(contentText);
     const parsedContent = JSON.parse(jsonString);
     console.log("Parsed content:", parsedContent);
 
@@ -584,7 +670,7 @@ async function handleQuestionAnswering(
   checkboxes: Record<string, string>;
 }> {
 
-  const promptText = `Do not specify resume in solution and when asked for numbers give pure numbers without any words.Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)} Resume: ${resume}`;
+  const promptText = `IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. Do not specify resume in solution and when asked for numbers give pure numbers without any words. Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)} Resume: ${resume}`;
 
   console.log('Sending question answering request to AI Service...');
 
@@ -596,17 +682,7 @@ async function handleQuestionAnswering(
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   try {
-    // Extract JSON from markdown block if present
-    const jsonMatch = contentText.match(/```json\n([\s\S]*?)\n```/);
-    let jsonString = '';
-
-    if (jsonMatch && jsonMatch[1]) {
-      jsonString = jsonMatch[1];
-    } else {
-      // Clean up potential markdown formatting if regex didn't match perfectly
-      jsonString = contentText.replace(/```json/g, '').replace(/```/g, '').trim();
-    }
-
+    const jsonString = extractJSON(contentText);
     const parsedContent = JSON.parse(jsonString);
     console.log("Parsed answers:", parsedContent);
 

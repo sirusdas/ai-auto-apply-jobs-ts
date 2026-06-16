@@ -50,8 +50,19 @@ export class AIService {
         }
 
         try {
-            return await provider.sendRequest(request.prompt, request);
+            const response = await provider.sendRequest(request.prompt, request);
+            // Reset retry count on successful request
+            chrome.storage.local.set({ aiRetryCount: 0 });
+            return response;
         } catch (error: any) {
+            console.error(`AI Provider ${providerId} failed:`, error);
+            
+            const isCooldown = this.isCooldownError(error);
+            if (isCooldown) {
+                console.log(`Detected cooldown/rate-limit error for ${providerId}.`);
+                throw new Error('RATE_LIMIT_COOLDOWN');
+            }
+
             // Check if this is a model-related error that we might be able to fix
             const errorMessage = error.message || '';
             const isModelError = errorMessage.toLowerCase().includes('model') || 
@@ -75,8 +86,11 @@ export class AIService {
                     if (updatedProvider) {
                         try {
                             return await updatedProvider.sendRequest(request.prompt, request);
-                        } catch (retryError) {
+                        } catch (retryError: any) {
                             console.error('Retry after model fix failed:', retryError);
+                            if (this.isCooldownError(retryError)) {
+                                throw new Error('RATE_LIMIT_COOLDOWN');
+                            }
                         }
                     }
                 }
@@ -89,6 +103,18 @@ export class AIService {
         }
     }
 
+    private isCooldownError(error: any): boolean {
+        const message = (error.message || '').toLowerCase();
+        return message.includes('429') || 
+               message.includes('rate limit') || 
+               message.includes('too many requests') ||
+               message.includes('quota exceeded') ||
+               message.includes('cool down') ||
+               message.includes('cooldown') ||
+               message.includes('exhausted') ||
+               message.includes('503'); // Service unavailable often means overloaded/cooling down
+    }
+
     private async sendRequestWithFallback(prompt: string, failedProviderId: string): Promise<AIResponse> {
         if (!this.settings) return { provider: 'none', content: '', error: 'Settings not initialized' };
 
@@ -96,15 +122,27 @@ export class AIService {
             .filter(p => p.enabled && p.id !== failedProviderId && p.apiKey)
             .sort((a, b) => (a.priority || 99) - (b.priority || 99));
 
+        let anyCooldown = false;
+
         for (const providerConfig of sortedProviders) {
             const provider = this.providers.get(providerConfig.id);
             if (provider) {
                 try {
                     console.log(`Falling back to AI provider: ${providerConfig.name}`);
-                    return await provider.sendRequest(prompt);
+                    const response = await provider.sendRequest(prompt);
+                    // Reset retry count on successful fallback
+                    chrome.storage.local.set({ aiRetryCount: 0 });
+                    return response;
                 } catch (error: any) {
                     console.error(`Fallback to ${providerConfig.name} failed:`, error);
                     
+                    if (this.isCooldownError(error)) {
+                        console.log(`Fallback provider ${providerConfig.id} also in cooldown.`);
+                        anyCooldown = true;
+                        // Don't return immediately, try other fallbacks if available
+                        continue; 
+                    }
+
                     const errorMessage = error.message || '';
                     const isModelError = errorMessage.toLowerCase().includes('model') || 
                                        errorMessage.includes('400') || 
@@ -122,9 +160,15 @@ export class AIService {
                                 const updatedProvider = this.providers.get(providerConfig.id);
                                 if (updatedProvider) {
                                     try {
-                                        return await updatedProvider.sendRequest(prompt);
-                                    } catch (retryError) {
+                                        const response = await updatedProvider.sendRequest(prompt);
+                                        chrome.storage.local.set({ aiRetryCount: 0 });
+                                        return response;
+                                    } catch (retryError: any) {
                                         console.error(`Retry for fallback ${providerConfig.id} failed:`, retryError);
+                                        if (this.isCooldownError(retryError)) {
+                                            anyCooldown = true;
+                                            continue;
+                                        }
                                     }
                                 }
                             }
@@ -133,6 +177,11 @@ export class AIService {
                     continue;
                 }
             }
+        }
+
+        // If we reach here, all providers failed. 
+        if (anyCooldown) {
+            throw new Error('RATE_LIMIT_COOLDOWN');
         }
 
         throw new Error('All AI providers failed including fallbacks.');

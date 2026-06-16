@@ -1,6 +1,7 @@
 
 import { addDelay, addShortDelay, addVeryShortDelay } from '../utils/delay';
 import { saveJob, jobExists } from '../utils/indexedDB';
+import { showToast } from '../utils/notifications';
 
 interface QuestionData {
     inputs: string[];
@@ -398,26 +399,37 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
 
     try {
         const response: any = await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-                action: 'answerJobQuestions',
-                inputs: questions.inputs,
-                radios: questions.radios,
-                dropdowns: questions.dropdowns,
-                checkboxes: questions.checkboxes,
-                resume: settings.compressedResumeYAML || settings.plainTextResume || ""
-            }, (res) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else if (res && res.success) {
-                    resolve(res.data);
-                } else {
-                    const errorMsg = res?.error || 'AI service returned failure';
-                    console.error('AI Question Answering Failed:', errorMsg);
-                    // Instead of continuing blindly, alert the user
-                    alert(`AI Service Issue: The AI service is having trouble. Please check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
-                    resolve(null);
-                }
-            });
+            const sendAction = () => {
+                chrome.runtime.sendMessage({
+                    action: 'answerJobQuestions',
+                    inputs: questions.inputs,
+                    radios: questions.radios,
+                    dropdowns: questions.dropdowns,
+                    checkboxes: questions.checkboxes,
+                    resume: settings.compressedResumeYAML || settings.plainTextResume || ""
+                }, (res) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else if (res && res.success) {
+                        resolve(res.data);
+                    } else if (res && res.error === 'AI_COOLDOWN' && !res.stop) {
+                        const retryAfter = res.retryAfter || 900000;
+                        const attempt = res.retryCount || 1;
+                        
+                        showToast(`AI Rate Limit (Answering) (Attempt ${attempt}/3). Waiting 15 mins...`, 'warning');
+                        console.log(`AI Cooldown (Answering) detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+                        
+                        setTimeout(sendAction, retryAfter);
+                    } else {
+                        const errorMsg = res?.error || 'AI service returned failure';
+                        console.error('AI Question Answering Failed:', errorMsg);
+                        // Instead of continuing blindly, alert the user
+                        alert(`AI Service Issue: ${errorMsg}. The application process for this job has been paused.`);
+                        resolve(null);
+                    }
+                });
+            };
+            sendAction();
         });
         return response;
     } catch (e: any) {
