@@ -702,77 +702,86 @@ function isCurrentUrlMatching(targetUrl: string): boolean {
 }
 
 function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
-  // Move to the next segment in the sequence:
-  // Hierarchy (Inner to Outer): Workplace Type -> Job Type -> Location -> Job Config
   console.log('Moving to next segment...');
-  // We are on the correct page, so clear any reload loop detection.
   sessionStorage.removeItem(RELOAD_KEY);
 
-  // Get current job config to access arrays
-  const jobConfig = configs[state.jobIndex];
-  const locations = (jobConfig.locations && jobConfig.locations.length > 0)
-    ? jobConfig.locations
-    : [{ locationName: '', locationTimer: '' }];
+  // Capture the URL of the current segment before we increment anything
+  const currentJobConfig = configs[state.jobIndex];
+  const currentArrays = getValidArrays(currentJobConfig);
+  const currentUrl = constructSearchUrl(
+    currentJobConfig.jobTitleName,
+    currentArrays.locations[state.locationIndex]?.locationName || '',
+    currentArrays.jobTypes[state.typeIndex]?.jobTypeName || '',
+    currentArrays.workplaceTypes[state.workplaceIndex]?.workplaceTypeName || ''
+  );
 
-  const jobTypes = (jobConfig.jobTypes && jobConfig.jobTypes.length > 0)
-    ? jobConfig.jobTypes
-    : [{ jobTypeName: '', jobTypeTimer: '' }];
+  let iterations = 0;
+  const maxIterations = 100; // Safety break
 
-  const workplaceTypes = (jobConfig.workplaceTypes && jobConfig.workplaceTypes.length > 0)
-    ? jobConfig.workplaceTypes
-    : [{ workplaceTypeName: '', workplaceTypeTimer: '' }];
+  while (iterations < maxIterations) {
+    iterations++;
 
-  // Increment Workplace Type index first (Innermost loop)
-  state.workplaceIndex++;
+    // Increment indices (Hierarchy: Workplace -> Type -> Location -> Job)
+    const jobConfig = configs[state.jobIndex];
+    const { locations, jobTypes, workplaceTypes } = getValidArrays(jobConfig);
 
-  // If we've exhausted all workplace types, move to next job type
-  if (state.workplaceIndex >= workplaceTypes.length) {
-    state.typeIndex++;
-    state.workplaceIndex = 0;
+    state.workplaceIndex++;
 
-    // If we've exhausted all job types, move to next location
-    if (state.typeIndex >= jobTypes.length) {
-      state.locationIndex++;
-      state.typeIndex = 0;
+    if (state.workplaceIndex >= workplaceTypes.length) {
+      state.typeIndex++;
+      state.workplaceIndex = 0;
 
-      // If we've exhausted all locations, move to next job config
-      if (state.locationIndex >= locations.length) {
-        state.jobIndex++;
-        state.locationIndex = 0;
+      if (state.typeIndex >= jobTypes.length) {
+        state.locationIndex++;
+        state.typeIndex = 0;
+
+        if (state.locationIndex >= locations.length) {
+          state.jobIndex++;
+          state.locationIndex = 0;
+        }
       }
     }
+
+    // Check if we ran out of jobs
+    if (state.jobIndex >= configs.length) {
+      break;
+    }
+
+    // Construct URL for the "next" potential segment
+    const nextJobConfig = configs[state.jobIndex];
+    const nextArrays = getValidArrays(nextJobConfig);
+    const nextUrl = constructSearchUrl(
+      nextJobConfig.jobTitleName,
+      nextArrays.locations[state.locationIndex]?.locationName || '',
+      nextArrays.jobTypes[state.typeIndex]?.jobTypeName || '',
+      nextArrays.workplaceTypes[state.workplaceIndex]?.workplaceTypeName || ''
+    );
+
+    // If the URLs are different, we've found our next unique segment!
+    if (nextUrl !== currentUrl) {
+      break;
+    }
+    
+    console.log('Next segment produces identical URL. Skipping to avoid redundant search...');
   }
 
-  state.startTime = Date.now(); // Reset start time for new segment
-
-  // Calculate duration for the next segment
+  state.startTime = Date.now();
   state.segmentDuration = calculateSegmentDuration(configs, state.jobIndex, state.locationIndex, state.typeIndex, state.workplaceIndex);
-
-  // Save and process
   saveState(state);
 
-  // If we still have more segments, process them
   if (state.jobIndex < configs.length) {
     const nextConfig = configs[state.jobIndex];
     const locName = (nextConfig.locations && nextConfig.locations[state.locationIndex]?.locationName) || 'Default Location';
-    showToast(`Moving to next search segment: ${nextConfig.jobTitleName} in ${locName}`, 'info');
+    showToast(`Moving to next search: ${nextConfig.jobTitleName} in ${locName}`, 'info');
     processCurrentSegment(state, configs);
   } else {
-    // All done with current cycle
-    console.log('All job configurations completed.');
-
-    // Check if we should run in loop
+    console.log('All unique job configurations completed.');
     chrome.storage.local.get(['runInLoop', 'shuffleJobs'], (result) => {
       if (result.runInLoop) {
-        console.log('Run in loop enabled. Restarting from beginning...');
-        
         let nextConfigs = configs;
         if (result.shuffleJobs) {
-          console.log('Shuffle Jobs is enabled. Reshuffling job configurations for the next loop...');
           nextConfigs = [...configs].sort(() => Math.random() - 0.5);
         }
-
-        // Reset state to beginning
         state.jobIndex = 0;
         state.locationIndex = 0;
         state.typeIndex = 0;
@@ -1154,7 +1163,7 @@ async function runAutoApplyProcess(myLoopId: number) {
 
   if (allJobs.length === 0) {
     console.log('No valid actionable jobs found on this page (they may have been skipped). Navigating to next page...');
-    await addDelay();
+    await addVeryShortDelay();
     if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
       await goToNextPage(myLoopId);
     }
@@ -1205,35 +1214,74 @@ async function runAutoApplyProcess(myLoopId: number) {
 }
 
 async function goToNextPage(myLoopId: number) {
-  // Use multiple fallback selectors for the "Next" button based on LinkedIn's HTML structure
-  const nextButton = document.querySelector(
-    '.jobs-search-pagination__button--next, button[aria-label="View next page"], button.artdeco-pagination__button--next'
-  ) as HTMLButtonElement;
+  // Find the specific pagination container for job search results
+  // This avoids picking up carousels or other pagination inside job details
+  const paginationContainer = document.querySelector('.jobs-search-results-list__pagination, .jobs-search-pagination');
+  
+  // 1. Check if we are already on the last page using the "Page X of Y" text
+  const pageState = paginationContainer?.querySelector('.jobs-search-pagination__page-state');
+  if (pageState) {
+    const text = pageState.textContent || '';
+    const match = text.match(/Page\s+(\d+)\s+of\s+(\d+)/i);
+    if (match) {
+      const current = parseInt(match[1]);
+      const total = parseInt(match[2]);
+      console.log(`Pagination state: Page ${current} of ${total}`);
+      if (current >= total) {
+        console.log(`Reached last page (${current}/${total}). Moving to next search segment...`);
+        if (currentState) {
+          moveToNextSegment(currentState, currentState.configs);
+        }
+        return;
+      }
+    }
+  }
 
-  if (nextButton && !nextButton.disabled && !nextButton.classList.contains('disabled')) {
+  // 2. Find the "Next" button specifically within the search results pagination
+  const nextButton = (paginationContainer?.querySelector(
+    '.jobs-search-pagination__button--next, button[aria-label="View next page"]'
+  ) || document.querySelector('.jobs-search-results-list__pagination .jobs-search-pagination__button--next')) as HTMLButtonElement;
+
+  const isButtonEnabled = nextButton && 
+                         !nextButton.disabled && 
+                         !nextButton.classList.contains('disabled') &&
+                         nextButton.offsetParent !== null; // Ensure it's visible
+
+  if (isButtonEnabled) {
+    const oldUrl = window.location.href;
     console.log('Navigating to next page...');
     
-    // Scroll the button into view to ensure any intersection observers trigger and it's clickable
     nextButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await addVeryShortDelay(); // Give it a moment to scroll
-    
+    await addVeryShortDelay();
     nextButton.click();
     
-    // Wait for the next page to load
+    // Wait and check if the URL actually changed
     await addDelay();
-    await addDelay(); // Adding a bit of extra delay for network requests
+    await addDelay();
+    
+    const newUrl = window.location.href;
+    if (oldUrl === newUrl) {
+      console.log('URL did not change after clicking Next. We might be at the end of results.');
+      await addDelay();
+      if (window.location.href === oldUrl) {
+         console.log('URL still unchanged. Moving to next search segment.');
+         if (currentState) {
+           moveToNextSegment(currentState, currentState.configs);
+         }
+         return;
+      }
+    }
     
     if (currentState && currentState.isRunning && myLoopId === currentLoopId) {
       runAutoApplyProcess(myLoopId);
     }
   } else {
-    console.log('No next page found or button is disabled. Moving to next segment...');
+    console.log('No next page found in search results. Moving to next search segment...');
     if (currentState) {
       moveToNextSegment(currentState, currentState.configs);
     } else {
       console.warn('Cannot move to next segment: no current state available.');
     }
-    //stopAutoApplyProcess();
   }
 }
 
@@ -1430,24 +1478,45 @@ async function processSingleJob(jobDetails: any, index: number, total: number) {
     await addVeryShortDelay();
 
     let clicked = false;
-    const titleLink = listItem.querySelector('a[href*="/jobs/view/"]') ||
-      listItem.querySelector('.job-card-list__title a') ||
-      listItem.querySelector('.artdeco-entity-lockup__title a') ||
-      listItem.querySelector('.job-card-container__title a') ||
-      listItem.querySelector('.job-card-list__title--link') ||
-      listItem.querySelector('.job-card-container__primary-description a') ||
-      listItem.querySelector('a[data-control-name="job_card_title"]');
-
-    if (titleLink) {
-      console.log('Found job title link:', titleLink);
-      (titleLink as HTMLElement).click();
+    
+    // Attempt to click a specific inner element that is NOT an 'a' tag
+    // This is the most reliable way to trigger the AJAX load without full navigation.
+    const innerClickTarget = listItem.querySelector('.artdeco-entity-lockup__content, .job-card-list__entity-lockup, .artdeco-entity-lockup__image') as HTMLElement;
+    
+    if (innerClickTarget) {
+      console.log('[v2] Clicking surgical inner target to avoid full navigation:', innerClickTarget.className);
+      
+      // Temporarily intercept clicks on the listItem to prevent full page navigations
+      const navigationInterceptor = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const link = target.closest('a');
+        if (link && (link.href.includes('/jobs/view/') || link.href.includes('/collections/'))) {
+          console.log('[v2] Intercepted potential full-page navigation link click');
+          // We don't preventDefault yet, because LinkedIn might need it for AJAX.
+          // But we can log it.
+        }
+      };
+      
+      listItem.addEventListener('click', navigationInterceptor, { capture: true, once: true });
+      innerClickTarget.click();
+      clicked = true;
+    } else {
+      console.log('[v2] No surgical target found, clicking listItem directly');
+      listItem.click();
       clicked = true;
     }
 
+    // Wait slightly for the UI to respond
+    await addVeryShortDelay();
+
+    // Only fallback to titleLink if we haven't successfully clicked anything or if we're desperate
     if (!clicked) {
-      console.log('No job title link found. Clicking job card...');
-      listItem.click();
-      clicked = true;
+      const titleLink = listItem.querySelector('a[href*="/jobs/view/"], .job-card-list__title--link') as HTMLElement;
+      if (titleLink) {
+        console.log('[v2] Desperate fallback to title link click');
+        titleLink.click();
+        clicked = true;
+      }
     }
 
     if (!clicked) {
