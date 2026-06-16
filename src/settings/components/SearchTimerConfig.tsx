@@ -24,6 +24,7 @@ const SearchTimerConfig: React.FC = () => {
   }>>([]);
 
   const [runInLoop, setRunInLoop] = useState<boolean>(false);
+  const [shuffleJobs, setShuffleJobs] = useState<boolean>(false);
 
   const jsonEditorRef = useRef<HTMLDivElement>(null);
   const jsonEditorInstance = useRef<any>(null);
@@ -31,7 +32,7 @@ const SearchTimerConfig: React.FC = () => {
 
   useEffect(() => {
     // Load saved job configurations
-    chrome.storage.local.get(['jobConfigs', 'runInLoop'], (result) => {
+    chrome.storage.local.get(['jobConfigs', 'runInLoop', 'shuffleJobs'], (result) => {
       if (result.jobConfigs) {
         setJobConfigs(restoreIds(result.jobConfigs));
       } else {
@@ -61,6 +62,10 @@ const SearchTimerConfig: React.FC = () => {
 
       if (result.runInLoop !== undefined) {
         setRunInLoop(result.runInLoop);
+      }
+      
+      if (result.shuffleJobs !== undefined) {
+        setShuffleJobs(result.shuffleJobs);
       }
     });
   }, []);
@@ -230,7 +235,7 @@ const SearchTimerConfig: React.FC = () => {
     }
 
     // 3. Persist to Storage
-    chrome.storage.local.set({ jobConfigs: processedConfigs, runInLoop }, () => {
+    chrome.storage.local.set({ jobConfigs: processedConfigs, runInLoop, shuffleJobs }, () => {
       setJobConfigs(processedConfigs);
 
       // Update JSON editor if it's open (usually it will be closed right after)
@@ -474,19 +479,35 @@ const SearchTimerConfig: React.FC = () => {
       </h2>
 
       {/* Run in Loop Toggle */}
-      <div className="form-group">
-        <label>
-          <input
-            type="checkbox"
-            checked={runInLoop}
-            onChange={(e) => setRunInLoop(e.target.checked)}
-          />
-          Run in Loop
-        </label>
-        <small>
-          Enable this option to continuously repeat the job search process.
-          When disabled, the search will run only once through all configurations.
-        </small>
+      <div className="form-group" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={runInLoop}
+              onChange={(e) => setRunInLoop(e.target.checked)}
+            />
+            Run in Loop
+          </label>
+          <small style={{ display: 'block', marginTop: '5px' }}>
+            Enable this option to continuously repeat the job search process.
+            When disabled, the search will run only once through all configurations.
+          </small>
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={shuffleJobs}
+              onChange={(e) => setShuffleJobs(e.target.checked)}
+            />
+            Shuffle Jobs
+          </label>
+          <small style={{ display: 'block', marginTop: '5px' }}>
+            Enable this option to randomly iterate through your job title configurations.
+          </small>
+        </div>
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>

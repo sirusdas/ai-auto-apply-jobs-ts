@@ -326,14 +326,14 @@ async function startNewAutoApplyProcess() {
   }
 
   // 1. Fetch configs
-  const result = await chrome.storage.local.get(['jobConfigs']);
-  const configs: JobConfig[] = result.jobConfigs || [];
+  const result = await chrome.storage.local.get(['jobConfigs', 'shuffleJobs']);
+  let configs: JobConfig[] = result.jobConfigs || [];
 
   // Enhanced Validation: Must have at least one config with at least one location and one job title
   const isValid = configs.length > 0 && configs.every(c =>
     c.jobTitleName.trim() !== '' &&
     c.locations && c.locations.length > 0 &&
-    c.locations.every(l => l.locationName.trim() !== '' && l.locationTimer.trim() !== '' && !isNaN(parseFloat(l.locationTimer)))
+    c.locations.every(l => (l.locationName || '').trim() !== '' && (l.locationTimer || '').trim() !== '' && !isNaN(parseFloat(l.locationTimer)))
   );
 
   if (!isValid) {
@@ -343,6 +343,12 @@ async function startNewAutoApplyProcess() {
       url: chrome.runtime.getURL('settings.html#search-timer')
     });
     return;
+  }
+
+  // Shuffle configs if enabled
+  if (result.shuffleJobs) {
+    console.log('Shuffle Jobs is enabled. Shuffling job configurations...');
+    configs = [...configs].sort(() => Math.random() - 0.5);
   }
 
   // 2. Initialize State
@@ -382,8 +388,9 @@ async function resumeAutoApplyProcess(state: AutoApplyState) {
     return;
   }
 
-  const result = await chrome.storage.local.get(['jobConfigs']);
-  const configs: JobConfig[] = result.jobConfigs || [];
+  // MUST use the configs saved in the state, because they might have been shuffled.
+  // If we reload them from chrome.storage.local, they will be unshuffled, breaking the index!
+  const configs: JobConfig[] = state.configs || [];
 
   if (!configs.length) {
     console.error('No configs found during resume');
@@ -755,18 +762,26 @@ function moveToNextSegment(state: AutoApplyState, configs: JobConfig[]) {
     console.log('All job configurations completed.');
 
     // Check if we should run in loop
-    chrome.storage.local.get(['runInLoop'], (result) => {
+    chrome.storage.local.get(['runInLoop', 'shuffleJobs'], (result) => {
       if (result.runInLoop) {
         console.log('Run in loop enabled. Restarting from beginning...');
+        
+        let nextConfigs = configs;
+        if (result.shuffleJobs) {
+          console.log('Shuffle Jobs is enabled. Reshuffling job configurations for the next loop...');
+          nextConfigs = [...configs].sort(() => Math.random() - 0.5);
+        }
+
         // Reset state to beginning
         state.jobIndex = 0;
         state.locationIndex = 0;
         state.typeIndex = 0;
         state.workplaceIndex = 0;
         state.startTime = Date.now();
-        state.segmentDuration = calculateSegmentDuration(configs, 0, 0, 0, 0);
+        state.configs = nextConfigs;
+        state.segmentDuration = calculateSegmentDuration(nextConfigs, 0, 0, 0, 0);
         saveState(state);
-        processCurrentSegment(state, configs);
+        processCurrentSegment(state, nextConfigs);
       } else {
         stopAutoApplyProcess();
       }
