@@ -1,6 +1,6 @@
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
-export function showToast(message: string, type: NotificationType = 'info') {
+export function showToast(message: string, type: NotificationType = 'info', duration: number = 5000) {
     // Check if we are in a DOM environment
     if (typeof document === 'undefined') return;
 
@@ -15,11 +15,11 @@ export function showToast(message: string, type: NotificationType = 'info') {
     // Trigger animation
     setTimeout(() => toast.classList.add('show'), 10);
 
-    // Remove after 3 seconds
+    // Remove after duration
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, duration);
 }
 
 function createToastContainer() {

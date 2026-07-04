@@ -1,4 +1,7 @@
 import { ModelInfo } from '../constants/aiModels';
+import { GeminiProvider } from './providers/geminiProvider';
+import { ClaudeProvider } from './providers/claudeProvider';
+import { OpenAIProvider } from './providers/openaiProvider';
 
 interface OpenAIListModelResponse {
   object: string;
@@ -223,17 +226,82 @@ export async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
 /**
  * Fetches models for a specific provider
  */
-export async function fetchProviderModels(providerId: string, apiKey: string): Promise<ModelInfo[]> {
-  switch (providerId) {
-    case 'openai':
-      return await fetchOpenAIModels(apiKey);
-    case 'claude':
-      return await fetchClaudeModels(apiKey);
-    case 'gemini':
-      return await fetchGeminiModels(apiKey);
-    default:
-      throw new Error(`Unsupported provider: ${providerId}`);
+export async function fetchProviderModels(provider: any): Promise<ModelInfo[]> {
+  // If running in a UI context (settings page), route through background script to bypass CORS
+  if (typeof window !== 'undefined' && chrome.runtime) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'fetchModels', provider }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.success) {
+          resolve(response.models);
+        } else {
+          reject(new Error(response?.error || 'Failed to fetch models'));
+        }
+      });
+    });
   }
+
+  // Otherwise (running in background), do the actual fetch
+  if (provider.isCustom) {
+    return await fetchCustomOpenAIModels(provider.baseUrl, provider.apiKey, provider.customModel);
+  }
+  
+  switch (provider.id) {
+    case 'openai':
+      return await fetchOpenAIModels(provider.apiKey);
+    case 'claude':
+      return await fetchClaudeModels(provider.apiKey);
+    case 'gemini':
+      return await fetchGeminiModels(provider.apiKey);
+    default:
+      throw new Error(`Unsupported provider: ${provider.id}`);
+  }
+}
+
+export async function fetchCustomOpenAIModels(baseUrl?: string, apiKey?: string, customModel?: string): Promise<ModelInfo[]> {
+    if (customModel) {
+        return [{
+            id: customModel,
+            name: customModel,
+            description: 'Custom defined model',
+            isPaid: false,
+            tier: 'free'
+        }];
+    }
+    
+    if (!baseUrl) {
+        throw new Error('Base URL is required to fetch models for a custom provider.');
+    }
+    
+    const endpoint = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl.replace(/\/$/, '')}/v1/models`;
+    
+    try {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+        
+        const res = await fetch(endpoint, { headers });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        
+        const data = await res.json();
+        
+        if (data && data.data && Array.isArray(data.data)) {
+            return data.data.map((m: any) => ({
+                id: m.id,
+                name: m.id,
+                description: `Custom model from ${baseUrl}`,
+                isPaid: false,
+                tier: 'free'
+            }));
+        }
+        
+        return [];
+    } catch (e) {
+        console.error('Failed to fetch custom models:', e);
+        return [];
+    }
 }
 
 /**
@@ -266,7 +334,7 @@ export async function handleModelFailure(providerId: string): Promise<boolean> {
     
     // 1. Fetch available models from API
     console.log(`Fetching latest models for ${providerId}...`);
-    const allAvailableModels = await fetchProviderModels(providerId, provider.apiKey);
+    const allAvailableModels = await fetchProviderModels(provider);
     
     if (!allAvailableModels || allAvailableModels.length === 0) {
       console.error(`No models returned from ${providerId} API.`);
@@ -331,5 +399,113 @@ export async function handleModelFailure(providerId: string): Promise<boolean> {
   } catch (error) {
     console.error('Error in handleModelFailure:', error);
     return false;
+  }
+}
+
+/**
+ * Returns the best default model based on user preference (light free > first free > first paid).
+ */
+export function getBestDefaultModel(models: ModelInfo[], providerId: string): string {
+  if (!models || models.length === 0) return '';
+  
+  let newModelId = '';
+  if (providerId === 'gemini') {
+    const freeModel = models.find(m => m.id.includes('flash') || m.id.includes('gemma') || m.tier === 'free');
+    if (freeModel) newModelId = freeModel.id;
+  } else if (providerId === 'openai') {
+    const gpt4oMini = models.find(m => m.id === 'gpt-4o-mini');
+    if (gpt4oMini) newModelId = gpt4oMini.id;
+  } else if (providerId === 'claude') {
+    const haiku = models.find(m => m.id.includes('haiku'));
+    if (haiku) newModelId = haiku.id;
+  }
+
+  if (newModelId) return newModelId;
+
+  const anyFree = models.find(m => m.tier === 'free' || !m.isPaid);
+  if (anyFree) return anyFree.id;
+
+  return models[0].id;
+}
+
+/**
+ * Tries to switch to another free model across enabled providers.
+ * @param failedModels Array of model IDs that have already failed during this cycle
+ * @returns Object indicating success and the new model ID
+ */
+export async function trySwitchToAnotherFreeModel(failedModels: string[]): Promise<{ success: boolean, newModelId: string }> {
+  try {
+    const result = await chrome.storage.local.get(['aiSettings']);
+    const aiSettings = result.aiSettings;
+    if (!aiSettings || !aiSettings.providers) return { success: false, newModelId: '' };
+
+    const allFailedModels = new Set(failedModels);
+
+    // First try to find a free model in the primary provider
+    const providersToTry = [...aiSettings.providers].sort((a, b) => {
+      if (a.id === aiSettings.primaryProvider) return -1;
+      if (b.id === aiSettings.primaryProvider) return 1;
+      return 0;
+    });
+
+    for (const provider of providersToTry) {
+      if (!provider.enabled || !provider.apiKey) continue;
+      
+      allFailedModels.add(provider.model); // Current model is considered failed
+
+      try {
+        const availableModels = await fetchProviderModels(provider);
+        const freeModels = availableModels.filter(m => 
+          (!m.isPaid || m.tier === 'free' || m.id.includes('flash') || m.id.includes('gemma')) 
+          && !allFailedModels.has(m.id)
+        );
+
+        for (const freeModel of freeModels) {
+          console.log(`Testing free model ${freeModel.id} for provider ${provider.id}...`);
+          try {
+            const tempConfig = { ...provider, model: freeModel.id };
+            let tempProvider: any = null;
+            
+            if (provider.id === 'gemini') tempProvider = new GeminiProvider(tempConfig);
+            else if (provider.id === 'claude') tempProvider = new ClaudeProvider(tempConfig);
+            else if (provider.id === 'openai') tempProvider = new OpenAIProvider(tempConfig);
+            
+            if (tempProvider) {
+              // Send a minimal request to test if the model responds without rate limiting
+              await tempProvider.sendRequest('Reply with "OK" only.');
+              
+              console.log(`Model ${freeModel.id} responded successfully! Switching to it.`);
+              const providerIndex = aiSettings.providers.findIndex((p: any) => p.id === provider.id);
+              aiSettings.providers[providerIndex].model = freeModel.id;
+              
+              // Make sure this provider becomes the primary if it wasn't
+              aiSettings.primaryProvider = provider.id;
+              
+              await chrome.storage.local.set({ aiSettings });
+              
+              chrome.runtime.sendMessage({
+                action: 'showNotification',
+                notification: {
+                  title: 'AI Model Switched',
+                  message: `Current model hit rate limit. Tested and switched to free model: ${freeModel.name}.`,
+                  type: 'basic'
+                }
+              });
+              return { success: true, newModelId: freeModel.id };
+            }
+          } catch (testError) {
+             console.log(`Test for ${freeModel.id} failed, skipping...`, testError);
+             allFailedModels.add(freeModel.id);
+          }
+        }
+      } catch (err) {
+        console.error(`Error fetching models for ${provider.id} while switching free model:`, err);
+      }
+    }
+
+    return { success: false, newModelId: '' };
+  } catch (error) {
+    console.error('Error switching free model', error);
+    return { success: false, newModelId: '' };
   }
 }

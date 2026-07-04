@@ -56,12 +56,15 @@ export interface InputFieldConfig {
 }
 
 export interface AIProvider {
-  id: string; // 'gemini' | 'claude' | 'chatgpt' | 'openai'
+  id: string; // 'gemini' | 'claude' | 'openai' | custom ids
   name: string; // Display name
   enabled: boolean;
   apiKey: string;
   model?: string; // Optional model selection
   priority?: number; // For fallback ordering
+  baseUrl?: string; // Custom endpoint URL
+  isCustom?: boolean; // Flag for custom providers
+  customModel?: string; // Allow manual typing of model if refresh fails
 }
 
 export interface AISettings {
@@ -69,10 +72,20 @@ export interface AISettings {
   primaryProvider: string; // ID of primary AI provider
   enableFallback: boolean; // Use other providers if primary fails
   timeout?: number; // Per-request timeout in ms
+  maxRetries?: number; // Maximum number of retries before action
+  pauseAfterRetries?: boolean; // Pause instead of stopping
+  pauseDuration?: number; // Duration to pause in minutes
+  tryOtherFreeModels?: boolean; // Try other free models if limit hit
+  
+  // JD Compression Settings
+  enableJdCompression?: boolean;
+  jdCompressionMethod?: 'regex' | 'local_ai' | 'cheap_api';
+  jdCompressionProviderId?: string; // Which provider to use if cheap_api is selected
 }
 
 export interface AIRequest {
   provider?: string;
+  systemPrompt?: string;
   prompt: string;
   maxTokens?: number;
   temperature?: number;

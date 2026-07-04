@@ -151,7 +151,7 @@ function initExtensionUI(): void {
 
       if (recentReloads.length > MAX_RELOADS) {
         console.error(`Extension reloaded ${recentReloads.length} times in a row. Stopping to prevent infinite loop.`);
-        alert(`AI Auto-Apply has been stopped because it was reloading the page too frequently. This can happen if LinkedIn's page structure has changed or there's a configuration issue.`);
+        showToast(`AI Auto-Apply has been stopped because it was reloading the page too frequently. This can happen if LinkedIn's page structure has changed or there's a configuration issue.`, 'error', 10000);
 
         // Stop the process and clear the reload history
         stopAutoApplyProcess();
@@ -337,7 +337,7 @@ async function startNewAutoApplyProcess() {
   );
 
   if (!isValid) {
-    alert('Configuration Error:\nAt least one Job Title and one Location with a valid Timer are required for the extension to work.\n\nOpening Search and Timer Configuration...');
+    showToast('Configuration Error:\nAt least one Job Title and one Location with a valid Timer are required for the extension to work.\n\nOpening Search and Timer Configuration...', 'error', 7000);
     chrome.runtime.sendMessage({
       action: 'openPage',
       url: chrome.runtime.getURL('settings.html#search-timer')
@@ -1063,18 +1063,20 @@ async function filterJobsByCompanyType(jobDetails: any[]): Promise<any[]> {
           } else if (res && res.success) {
             resolve(res.data);
           } else if (res && res.error === 'AI_COOLDOWN' && !res.stop) {
-            const retryAfter = res.retryAfter || 900000;
+            const retryAfter = res.retryAfter || 15000;
             const attempt = res.retryCount || 1;
+            const waitSecs = Math.round(retryAfter/1000);
+            const timeStr = waitSecs > 60 ? `${Math.round(waitSecs/60)} mins` : `${waitSecs}s`;
             
-            showToast(`AI Rate Limit (Filter) (Attempt ${attempt}/3). Waiting 15 mins...`, 'warning');
-            console.log(`AI Cooldown (Filter) detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+            showToast(`AI Rate Limit (Filter) (Attempt ${attempt}). Waiting ${timeStr}...`, 'warning');
+            console.log(`AI Cooldown (Filter) detected. Attempt ${attempt}. Waiting ${waitSecs}s...`);
             
             setTimeout(sendAction, retryAfter);
           } else {
             const errorMsg = res?.error || 'AI service returned failure';
             console.error('AI Company Filter Failed:', errorMsg);
             // Instead of continuing blindly, alert the user
-            alert(`AI Service Error (Company Filter): ${errorMsg}\n\nPlease check your AI settings and API keys, or contact support: tools.qerds@gmail.com`);
+            showToast(`AI Service Error (Company Filter): ${errorMsg}\n\nPlease check your AI settings and API keys, or contact support: tools.qerds@gmail.com`, 'error', 10000);
             stopAutoApplyProcess();
             resolve(null);
           }
@@ -1326,18 +1328,20 @@ async function checkJobMatch(jobDetails: any): Promise<number | false> {
             } else if (response && response.success) {
               resolve(response.data);
             } else if (response && response.error === 'AI_COOLDOWN' && !response.stop) {
-              const retryAfter = response.retryAfter || 900000;
+              const retryAfter = response.retryAfter || 15000;
               const attempt = response.retryCount || 1;
+              const waitSecs = Math.round(retryAfter/1000);
+              const timeStr = waitSecs > 60 ? `${Math.round(waitSecs/60)} mins` : `${waitSecs}s`;
               
-              showToast(`AI Rate Limit detected (Attempt ${attempt}/3). Taking a 15-minute break. Do not close this tab.`, 'warning');
-              console.log(`AI Cooldown detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+              showToast(`AI Rate Limit detected (Attempt ${attempt}). Waiting ${timeStr}...`, 'warning');
+              console.log(`AI Cooldown detected. Attempt ${attempt}. Waiting ${waitSecs}s...`);
               
               setTimeout(sendAction, retryAfter);
             } else {
               const errorMsg = response?.error || 'AI service returned failure';
               console.error('AI Service Failed:', errorMsg);
               // Instead of continuing blindly, alert the user as requested
-              alert(`AI Service Issue: ${errorMsg}. The extension has been stopped to prevent further errors.`);
+              showToast(`AI Service Issue: ${errorMsg}. The extension has been stopped to prevent further errors.`, 'error', 8000);
               stopAutoApplyProcess();
               resolve(null);
             }

@@ -19,22 +19,15 @@ import { migrateToMultiAI, migrateJobsToIndexedDB } from '../utils/migration';
 import { AISettings, AIProvider } from '../types';
 import * as tokenService from '../utils/tokenService';
 import { getAllJobs } from '../utils/indexedDB';
+import { trySwitchToAnotherFreeModel, fetchProviderModels } from '../utils/modelFetcher';
+import { compressJobDescription } from '../utils/jdCompressor';
 
 const aiService = new AIService();
 
 async function initAIService() {
   await migrateToMultiAI();
   await migrateJobsToIndexedDB();
-  const result = await chrome.storage.local.get(['aiSettings']);
-  const settings = result.aiSettings as AISettings;
-
-  if (settings) {
-    settings.providers.forEach((p: AIProvider) => {
-      if (p.id === 'gemini') aiService.registerProvider(new GeminiProvider(p));
-      if (p.id === 'claude') aiService.registerProvider(new ClaudeProvider(p));
-      if (p.id === 'openai') aiService.registerProvider(new OpenAIProvider(p));
-    });
-  }
+  await aiService.init();
 }
 
 // Function to initialize job count from IndexedDB
@@ -178,34 +171,72 @@ function extractJSON(text: string): string {
 }
 
 async function handleAIError(error: any): Promise<{ isRetryable: boolean; retryCount: number; stop: boolean; waitTime: number }> {
-  const result = await chrome.storage.local.get(['aiRetryCount']);
+  const result = await chrome.storage.local.get(['aiRetryCount', 'aiSettings']);
   const aiRetryCount = result.aiRetryCount || 0;
+  const aiSettings = result.aiSettings || {};
+  
+  const maxRetries = aiSettings.maxRetries ?? 3;
+  const pauseAfterRetries = aiSettings.pauseAfterRetries ?? false;
+  const pauseDuration = aiSettings.pauseDuration ?? 30;
+  const tryOtherFreeModels = aiSettings.tryOtherFreeModels ?? true;
   
   // Check if it's a rate limit error or a parsing error
   const isRateLimit = error.message === 'RATE_LIMIT_COOLDOWN' || 
                      error.message.includes('429') || 
                      error.message.toLowerCase().includes('rate limit');
   const isParsingError = error.message.includes('Failed to parse AI response');
+  const isNetworkError = error.message.toLowerCase().includes('failed to fetch') || 
+                         error.message.toLowerCase().includes('networkerror') ||
+                         error.message.toLowerCase().includes('fetch failed');
   
-  const isRetryable = isRateLimit || isParsingError;
+  const isRetryable = isRateLimit || isParsingError || isNetworkError;
 
   if (isRetryable) {
-    if (aiRetryCount < 3) {
+    if (aiRetryCount < maxRetries) {
       const newCount = aiRetryCount + 1;
       await chrome.storage.local.set({ aiRetryCount: newCount });
       
-      // For rate limits, wait 15 mins. For parsing errors, wait 30 seconds (or 15 mins if user insists on "any error")
-      // The user said: "we need to just take a break for 15 min and then try again"
-      // So I will stick to 15 mins for both to be safe as per user's request for "any failure".
-      const waitTime = 15 * 60 * 1000;
+      const waitTime = 15 * 1000; // 15 seconds for standard retry
       
-      console.log(`AI Error detected (${error.message}). Attempt ${newCount}/3. Waiting 15 minutes.`);
+      console.log(`AI Error detected (${error.message}). Attempt ${newCount}/${maxRetries}. Waiting 15 seconds.`);
       return { isRetryable: true, retryCount: newCount, stop: false, waitTime };
     } else {
-      console.error(`AI Error limit reached (3 attempts). Error: ${error.message}. Stopping extension.`);
+      console.error(`AI Error limit reached (${maxRetries} attempts). Error: ${error.message}.`);
+      
+      if (tryOtherFreeModels) {
+        const { failedModelsThisCycle = [] } = await chrome.storage.local.get(['failedModelsThisCycle']);
+        const switchResult = await trySwitchToAnotherFreeModel(failedModelsThisCycle);
+        
+        if (switchResult.success) {
+          // Add the new model to the list of failed models if it fails again
+          failedModelsThisCycle.push(switchResult.newModelId);
+          await chrome.storage.local.set({ failedModelsThisCycle, aiRetryCount: 0 });
+          console.log('Successfully switched to another free model. Retrying...');
+          return { isRetryable: true, retryCount: 0, stop: false, waitTime: 2000 };
+        } else {
+          console.log('No other free models available to try.');
+          await chrome.storage.local.remove(['failedModelsThisCycle']);
+        }
+      }
+
       await chrome.storage.local.remove(['aiRetryCount']);
-      await stopExtension(`AI service is persistently failing after 3 attempts. Last error: ${error.message}. Please check your settings or try again in 30 minutes.`);
-      return { isRetryable: true, retryCount: aiRetryCount, stop: true, waitTime: 0 };
+      
+      if (pauseAfterRetries) {
+        const waitTime = pauseDuration * 60 * 1000;
+        console.log(`Pausing for ${pauseDuration} minutes instead of stopping.`);
+        // Notify the user it's pausing instead of stopping
+        chrome.notifications.create('ai-paused', {
+          type: 'basic',
+          iconUrl: 'laaa_logo_128x128.png',
+          title: 'Auto-Apply Paused',
+          message: `AI error limit reached. Pausing for ${pauseDuration} minutes before trying again.`,
+          priority: 2
+        });
+        return { isRetryable: true, retryCount: maxRetries, stop: false, waitTime };
+      } else {
+        await stopExtension(`AI service is persistently failing after ${maxRetries} attempts. Last error: ${error.message}. Please check your settings or try again in ${pauseDuration} minutes.`);
+        return { isRetryable: true, retryCount: aiRetryCount, stop: true, waitTime: 0 };
+      }
     }
   }
   
@@ -361,6 +392,15 @@ chrome.runtime.onMessage.addListener((request: any, sender: chrome.runtime.Messa
         });
     });
     return true; // Keep channel open
+  }
+
+  if (request.action === 'fetchModels') {
+    const { provider } = request;
+    console.log(`Proxying fetch models for ${provider.id}...`);
+    fetchProviderModels(provider)
+      .then(models => sendResponse({ success: true, models }))
+      .catch(error => sendResponse({ success: false, error: error.message || 'Unknown error' }));
+    return true;
   }
 
   if (request.action === 'answerJobQuestions') {
@@ -555,12 +595,20 @@ async function handleCompanyFiltering(companies: string[]): Promise<{ product_co
 
 
 async function handleJobMatch(jobDetails: any, resume: string): Promise<any> {
-  // Construct the prompt
-  const promptText = 'IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. As per resume and jd provided Also note: company must be primary product based company(IT, non-IT) or non-IT based service companies only. Output as {"company_name":"","company_type":"service/product", "industry":"IT/Non-IT","match_score":0} note match_score based on [1. Average Match, 2. Above average, 3. Good, 4. Excellent, 5. Outstanding]. Resume: ' + resume + " JD: Title:" + jobDetails.jobTitle + " Desc: " + jobDetails.description + " Company: " + jobDetails.company;
+  const result = await chrome.storage.local.get(['aiSettings']);
+  const aiSettings = result.aiSettings;
+  
+  let compressedJD = jobDetails.description;
+  if (aiSettings && aiSettings.enableJdCompression) {
+    compressedJD = await compressJobDescription(jobDetails.description, aiSettings);
+  }
+
+  const systemPrompt = 'IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. As per resume provided Also note: company must be primary product based company(IT, non-IT) or non-IT based service companies only.\n\nResume:\n' + resume;
+  const promptText = 'Output as {"company_name":"","company_type":"service/product", "industry":"IT/Non-IT","match_score":0} note match_score based on [1. Average Match, 2. Above average, 3. Good, 4. Excellent, 5. Outstanding]. JD: Title:"' + jobDetails.jobTitle + '" Desc: "' + compressedJD + '" Company: "' + jobDetails.company + '"';
 
   console.log('Sending request to AI Service...');
 
-  const response = await aiService.sendRequest({ prompt: promptText });
+  const response = await aiService.sendRequest({ systemPrompt: systemPrompt, prompt: promptText });
   console.log("Received AI response:", response);
 
   const contentText = response.content.trim();
@@ -670,11 +718,12 @@ async function handleQuestionAnswering(
   checkboxes: Record<string, string>;
 }> {
 
-  const promptText = `IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. Do not specify resume in solution and when asked for numbers give pure numbers without any words. Select the correct options after comparing with my resume and output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)} Resume: ${resume}`;
+  const systemPrompt = `IMPORTANT: Output ONLY a valid JSON object. No conversation, no preamble. Do not specify resume in solution and when asked for numbers give pure numbers without any words. Select the correct options after comparing with my resume.\n\nResume:\n${resume}`;
+  const promptText = `Output the data as {"inputs":{"Your Name": "suresh", ...}, "dropdowns":{...}, "radios":{...}, "checkboxes":{ "I agree": "yes", ...}} for the below Inputs: ${JSON.stringify(inputs)} || Radios: ${JSON.stringify(radios)} || Dropdown: ${JSON.stringify(dropdowns)} || Checkboxes: ${JSON.stringify(checkboxes)}`;
 
   console.log('Sending question answering request to AI Service...');
 
-  const response = await aiService.sendRequest({ prompt: promptText });
+  const response = await aiService.sendRequest({ systemPrompt: systemPrompt, prompt: promptText });
   console.log("Received AI answer response:", response);
 
   const contentText = response.content.trim();

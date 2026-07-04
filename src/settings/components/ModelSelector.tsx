@@ -58,8 +58,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ providerId, selectedModel
             if (aiSettings && aiSettings.providers) {
                 const provider = aiSettings.providers.find((p: AIProvider) => p.id === providerId);
                 
-                if (provider && provider.apiKey) {
-                    const models = await fetchProviderModels(providerId, provider.apiKey);
+                if (provider && (provider.apiKey || provider.isCustom)) {
+                    const models = await fetchProviderModels(provider);
                     setDynamicModels(models);
                     setUseDynamicModels(true);
                 } else {

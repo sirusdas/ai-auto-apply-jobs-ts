@@ -7,7 +7,7 @@ export class GeminiProvider implements IAIProvider {
 
     constructor(private config: AIProvider) { }
 
-    async sendRequest(prompt: string): Promise<AIResponse> {
+    async sendRequest(prompt: string, systemPrompt?: string): Promise<AIResponse> {
         const apiKey = this.config.apiKey;
         const model = this.config.model || 'gemma-3-27b-it';
 
@@ -15,12 +15,20 @@ export class GeminiProvider implements IAIProvider {
             throw new Error('Gemini API key not configured.');
         }
 
+        const body: any = {
+            contents: [{ parts: [{ text: prompt }] }]
+        };
+
+        if (systemPrompt) {
+            body.systemInstruction = {
+                parts: [{ text: systemPrompt }]
+            };
+        }
+
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -31,6 +39,10 @@ export class GeminiProvider implements IAIProvider {
 
         const result = await response.json();
         const contentText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
+        if (!contentText) {
+            throw new Error('Gemini API returned an empty response. This may be due to safety filters or an invalid request.');
+        }
 
         return {
             provider: this.id,

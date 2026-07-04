@@ -7,12 +7,22 @@ export class ClaudeProvider implements IAIProvider {
 
     constructor(private config: AIProvider) { }
 
-    async sendRequest(prompt: string): Promise<AIResponse> {
+    async sendRequest(prompt: string, systemPrompt?: string): Promise<AIResponse> {
         const apiKey = this.config.apiKey;
         const model = this.config.model || 'claude-3-5-sonnet-20241022';
 
         if (!apiKey) {
             throw new Error('Claude API key not configured.');
+        }
+        
+        const body: any = {
+            model: model,
+            max_tokens: 4096,
+            messages: [{ role: 'user', content: prompt }]
+        };
+        
+        if (systemPrompt) {
+            body.system = systemPrompt;
         }
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -23,11 +33,7 @@ export class ClaudeProvider implements IAIProvider {
                 'anthropic-version': '2023-06-01',
                 'dangerously-allow-browser': 'true' // Note: This is usually for client-side SDKs, for fetch we just send headers
             },
-            body: JSON.stringify({
-                model: model,
-                max_tokens: 4096,
-                messages: [{ role: 'user', content: prompt }]
-            })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {

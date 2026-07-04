@@ -224,10 +224,10 @@ async function performDryRun(jobDetails: any, shouldStop?: () => boolean): Promi
         const nextBtn = findButton('Next', currentModal) || findButton('Review', currentModal) || findButton('Continue to next step', currentModal);
 
         // Collect questions on current page
-        const inputQuestions = await gatherInputFieldChecks();
-        const radioQuestions = await gatherRadioButtonChecks();
-        const dropdownQuestions = await gatherDropdownChecks();
-        const checkboxQuestions = await gatherCheckboxChecks();
+        const inputQuestions = await gatherInputFieldChecks(currentModal);
+        const radioQuestions = await gatherRadioButtonChecks(currentModal);
+        const dropdownQuestions = await gatherDropdownChecks(currentModal);
+        const checkboxQuestions = await gatherCheckboxChecks(currentModal);
 
         collected.inputs.push(...inputQuestions);
         collected.radios.push(...radioQuestions);
@@ -235,13 +235,13 @@ async function performDryRun(jobDetails: any, shouldStop?: () => boolean): Promi
         collected.checkboxes.push(...checkboxQuestions);
 
         // Fill current page with dummy data to proceed
-        await fillDummyData();
+        await fillDummyData(currentModal);
 
         // Also apply any AI answers we've gathered so far in this dry run
-        await performInputFieldChecks(dryRunAnswers.inputs);
-        await performRadioButtonChecks(dryRunAnswers.radios);
-        await performDropdownChecks(dryRunAnswers.dropdowns);
-        await performCheckboxChecks(dryRunAnswers.checkboxes);
+        await performInputFieldChecks(dryRunAnswers.inputs, currentModal);
+        await performRadioButtonChecks(dryRunAnswers.radios, currentModal);
+        await performDropdownChecks(dryRunAnswers.dropdowns, currentModal);
+        await performCheckboxChecks(dryRunAnswers.checkboxes, currentModal);
 
         if (nextBtn) {
             console.log('DryRun: Clicking Next/Review button inside modal...');
@@ -254,7 +254,7 @@ async function performDryRun(jobDetails: any, shouldStop?: () => boolean): Promi
                 console.warn(`Dry run blocked by error: "${errorMsg}". Attempting AI retry...`);
 
                 // Attempt AI-driven retry even in dry run
-                const retryAttempted = await handleValidationRetry(dryRunAnswers, jobDetails);
+                const retryAttempted = await handleValidationRetry(dryRunAnswers, jobDetails, currentModal);
                 if (retryAttempted) {
                     console.log('DryRun: AI retry filled fields. Clicking Next again...');
                     nextBtn.click();
@@ -315,7 +315,7 @@ async function discardApplication() {
 
         // 2. Click Discard confirmation button
         // LinkedIn shows a "Save this application?" or direct discard confirmation
-        const confirmationButtons = Array.from(document.querySelectorAll('button'));
+        const confirmationButtons = Array.from(modal.querySelectorAll('button'));
         const discardConfirmBtn = confirmationButtons.find(b =>
             b.innerText.trim().toLowerCase() === 'discard' ||
             b.getAttribute('data-control-name') === 'discard_application_confirm_btn' ||
@@ -413,18 +413,20 @@ async function fetchAIAnswers(questions: QuestionData, jobDetails: any): Promise
                     } else if (res && res.success) {
                         resolve(res.data);
                     } else if (res && res.error === 'AI_COOLDOWN' && !res.stop) {
-                        const retryAfter = res.retryAfter || 900000;
+                        const retryAfter = res.retryAfter || 15000;
                         const attempt = res.retryCount || 1;
+                        const waitSecs = Math.round(retryAfter/1000);
+                        const timeStr = waitSecs > 60 ? `${Math.round(waitSecs/60)} mins` : `${waitSecs}s`;
                         
-                        showToast(`AI Rate Limit (Answering) (Attempt ${attempt}/3). Waiting 15 mins...`, 'warning');
-                        console.log(`AI Cooldown (Answering) detected. Attempt ${attempt}/3. Waiting ${retryAfter/1000}s...`);
+                        showToast(`AI Rate Limit (Answering) (Attempt ${attempt}). Waiting ${timeStr}...`, 'warning');
+                        console.log(`AI Cooldown (Answering) detected. Attempt ${attempt}. Waiting ${waitSecs}s...`);
                         
                         setTimeout(sendAction, retryAfter);
                     } else {
                         const errorMsg = res?.error || 'AI service returned failure';
                         console.error('AI Question Answering Failed:', errorMsg);
                         // Instead of continuing blindly, alert the user
-                        alert(`AI Service Issue: ${errorMsg}. The application process for this job has been paused.`);
+                        showToast(`AI Service Issue: ${errorMsg}. The application process for this job has been paused.`, 'error', 8000);
                         resolve(null);
                     }
                 });
@@ -686,7 +688,7 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
         await performSafetyReminderCheck();
         await validateAndCloseConfirmationModal();
 
-        const currentModal = document.querySelector('.artdeco-modal') as HTMLElement;
+        const currentModal = document.querySelector('.artdeco-modal') as HTMLElement || document;
         if (!currentModal) {
             console.log('RealRun: Modal closed/lost.');
             return;
@@ -698,13 +700,13 @@ async function performRealRun(answers: Answers, jobDetails: any, shouldStop?: ()
 
         // Fill Data using Answers
         console.log('RealRun: Filling input fields...');
-        await performInputFieldChecks(answers.inputs);
+        await performInputFieldChecks(answers.inputs, currentModal);
         console.log('RealRun: Filling radio buttons...');
-        await performRadioButtonChecks(answers.radios);
+        await performRadioButtonChecks(answers.radios, currentModal);
         console.log('RealRun: Filling dropdowns...');
-        await performDropdownChecks(answers.dropdowns);
+        await performDropdownChecks(answers.dropdowns, currentModal);
         console.log('RealRun: Filling checkboxes...');
-        await performCheckboxChecks(answers.checkboxes);
+        await performCheckboxChecks(answers.checkboxes, currentModal);
 
         // Capture form elements AFTER filling for saving accurately
         console.log('RealRun: Capturing filled form data...');
@@ -898,7 +900,7 @@ async function periodicallyCheckAndCloseModals(stopChecking: () => boolean) {
     }
 }
 
-function logFormState(modal: HTMLElement) {
+function logFormState(modal: HTMLElement | Document) {
     // Log form elements
     const inputs = modal.querySelectorAll('input, textarea');
     const selects = modal.querySelectorAll('select');
@@ -995,7 +997,7 @@ function findButton(text: string, container: HTMLElement | Document = document):
     return buttons.find(b => b.innerText.trim().includes(text) && b.offsetParent !== null) || null; // Ensure visible
 }
 
-function getFormElements(modal: HTMLElement) {
+function getFormElements(modal: HTMLElement | Document) {
     // Get form elements
     const inputs = modal.querySelectorAll('input, textarea');
     const selects = modal.querySelectorAll('select');
@@ -1101,7 +1103,7 @@ function getFormElements(modal: HTMLElement) {
  * Captures form elements from the current modal and updates the formData object.
  * This avoids duplicate entries by updating existing fields with new values.
  */
-function capturePageFormData(modal: HTMLElement, formData: any) {
+function capturePageFormData(modal: HTMLElement | Document, formData: any) {
     const formElements = getFormElements(modal);
 
     // Update or add inputs
@@ -1243,42 +1245,78 @@ async function getErrorFieldQuestions(): Promise<QuestionData> {
 /**
  * Handles validation retry by fetching improved answers from AI for problematic fields.
  */
-async function handleValidationRetry(currentAnswers: Answers, jobDetails: any): Promise<boolean> {
-    console.log('Validation Errors Detected. Starting AI Retry mechanism...');
+async function handleValidationRetry(currentAnswers: Answers, jobDetails: any, context: HTMLElement | Document = document): Promise<boolean> {
+    console.log('Validating errors and retrying via AI...');
 
-    const errorQuestions = await getErrorFieldQuestions();
+    const errorQuestions: QuestionData = { inputs: [], radios: [], dropdowns: [], checkboxes: [] };
+    const errorContainers = Array.from(context.querySelectorAll('.artdeco-inline-feedback--error'));
+
+    if (errorContainers.length === 0) {
+        console.log('No error containers found to retry.');
+        return false;
+    }
+
+    // We'll just grab ALL questions currently on screen again, but with errors noted
+    const pageInputs = await gatherInputFieldChecks(context);
+    const pageRadios = await gatherRadioButtonChecks(context);
+    const pageDropdowns = await gatherDropdownChecks(context);
+    const pageCheckboxes = await gatherCheckboxChecks(context);
+
+    errorQuestions.inputs.push(...pageInputs);
+    errorQuestions.radios.push(...pageRadios);
+    errorQuestions.dropdowns.push(...pageDropdowns);
+    errorQuestions.checkboxes.push(...pageCheckboxes);
+
     const hasErrors = errorQuestions.inputs.length > 0 || errorQuestions.radios.length > 0 || errorQuestions.dropdowns.length > 0 || errorQuestions.checkboxes.length > 0;
 
     if (!hasErrors) {
-        console.log('No specific error fields identified, but error message exists.');
         return false;
     }
 
-    console.log('Problematic fields identified:', errorQuestions);
+    try {
+        console.log('Sending errored fields to AI for correction...');
+        // Request correction from background script
+        const improvedAnswers = await new Promise<any>((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                action: 'answerJobQuestions',
+                inputs: errorQuestions.inputs,
+                radios: errorQuestions.radios,
+                dropdowns: errorQuestions.dropdowns,
+                checkboxes: errorQuestions.checkboxes,
+                isRetry: true // Give the AI a hint that this is a correction
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (response.error) {
+                    reject(new Error(response.error));
+                } else {
+                    resolve(response.answers);
+                }
+            });
+        });
 
-    // Fetch improved answers from AI
-    const improvedAnswers = await fetchAIAnswers(errorQuestions, jobDetails);
-    if (!improvedAnswers) {
-        console.warn('AI failed to provide improved answers for retry.');
-        return false;
+        if (improvedAnswers) {
+            console.log('Received corrected answers from AI:', improvedAnswers);
+            
+            // Merge corrected answers back into currentAnswers
+            Object.assign(currentAnswers.inputs, improvedAnswers.inputs);
+            Object.assign(currentAnswers.radios, improvedAnswers.radios);
+            Object.assign(currentAnswers.dropdowns, improvedAnswers.dropdowns);
+            Object.assign(currentAnswers.checkboxes, improvedAnswers.checkboxes);
+
+            // Re-apply the answers
+            await performInputFieldChecks(currentAnswers.inputs, context);
+            await performRadioButtonChecks(currentAnswers.radios, context);
+            await performDropdownChecks(currentAnswers.dropdowns, context);
+            await performCheckboxChecks(currentAnswers.checkboxes, context);
+            
+            return true;
+        }
+    } catch (error) {
+        console.error('Failed to get corrected answers from AI:', error);
     }
 
-    console.log('Received improved definitions from AI:', improvedAnswers);
-
-    // Merge improved answers into currentAnswers
-    Object.assign(currentAnswers.inputs, improvedAnswers.inputs);
-    Object.assign(currentAnswers.radios, improvedAnswers.radios);
-    Object.assign(currentAnswers.dropdowns, improvedAnswers.dropdowns);
-    Object.assign(currentAnswers.checkboxes, improvedAnswers.checkboxes);
-
-    // Re-fill the fields
-    console.log('Re-filling problematic fields with improved answers...');
-    await performInputFieldChecks(currentAnswers.inputs);
-    await performRadioButtonChecks(currentAnswers.radios);
-    await performDropdownChecks(currentAnswers.dropdowns);
-    await performCheckboxChecks(currentAnswers.checkboxes);
-
-    return true;
+    return false;
 }
 
 
@@ -1323,8 +1361,8 @@ async function fillInput(input: HTMLInputElement | HTMLTextAreaElement, value: s
     }
 }
 
-async function gatherCheckboxChecks(): Promise<string[]> {
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+async function gatherCheckboxChecks(context: HTMLElement | Document = document): Promise<string[]> {
+    const checkboxes = context.querySelectorAll('input[type="checkbox"]');
     const questions: string[] = [];
     for (const checkbox of Array.from(checkboxes) as HTMLInputElement[]) {
         if (checkbox.disabled) continue;
@@ -1337,8 +1375,8 @@ async function gatherCheckboxChecks(): Promise<string[]> {
     return questions;
 }
 
-async function performCheckboxChecks(answers: Record<string, string>) {
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+async function performCheckboxChecks(answers: Record<string, string>, context: HTMLElement | Document = document) {
+    const checkboxes = context.querySelectorAll('input[type="checkbox"]');
     for (const checkbox of Array.from(checkboxes) as HTMLInputElement[]) {
         if (checkbox.disabled) continue;
         const container = checkbox.closest('.fb-dash-form-element') || checkbox.parentElement;
@@ -1356,8 +1394,8 @@ async function performCheckboxChecks(answers: Record<string, string>) {
     }
 }
 
-async function performInputFieldChecks(answers: Record<string, string>) {
-    const containers = document.querySelectorAll('.fb-dash-form-element');
+async function performInputFieldChecks(answers: Record<string, string>, context: HTMLElement | Document = document) {
+    const containers = context.querySelectorAll('.fb-dash-form-element');
     const defaultFields = await getDefaultFields();
 
     // Create a combined answers object with defaults
@@ -1393,11 +1431,11 @@ async function performInputFieldChecks(answers: Record<string, string>) {
     }
 }
 
-async function fillDummyData() {
+async function fillDummyData(context: HTMLElement | Document = document) {
     console.log('DryRun: Filling dummy data...');
 
     // 1. Inputs and Textareas
-    const containers = document.querySelectorAll('.fb-dash-form-element');
+    const containers = context.querySelectorAll('.fb-dash-form-element');
     for (const container of Array.from(containers)) {
         const label = container.querySelector('.artdeco-text-input--label') || container.querySelector('label');
         const input = container.querySelector('input[type="text"], input:not([type]), textarea') as HTMLInputElement;
@@ -1429,7 +1467,7 @@ async function fillDummyData() {
 
     // 2. Radios - Select first in each group
     // Broader search for fieldsets containing radios
-    const fieldsets = document.querySelectorAll('fieldset');
+    const fieldsets = context.querySelectorAll('fieldset');
     for (const fieldset of Array.from(fieldsets)) {
         const radios = Array.from(fieldset.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
         if (radios.length > 0 && !radios.some(r => r.checked)) {
@@ -1440,7 +1478,7 @@ async function fillDummyData() {
     }
 
     // 3. Dropdowns - Select second option (first non-placeholder)
-    const selects = document.querySelectorAll('select');
+    const selects = context.querySelectorAll('select');
     for (const select of Array.from(selects) as HTMLSelectElement[]) {
         if (select.selectedIndex <= 0 && select.options.length > 1) {
             console.log(`DryRun: Selecting option for dropdown`);
@@ -1457,7 +1495,7 @@ async function fillDummyData() {
     }
 
     // 4. Checkboxes - Check all
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = context.querySelectorAll('input[type="checkbox"]');
     for (const cb of Array.from(checkboxes) as HTMLInputElement[]) {
         if (!cb.checked && !cb.disabled) {
             console.log(`DryRun: Checking checkbox`);
@@ -1467,8 +1505,8 @@ async function fillDummyData() {
     }
 }
 
-async function gatherInputFieldChecks(): Promise<string[]> {
-    const containers = document.querySelectorAll('.fb-dash-form-element');
+async function gatherInputFieldChecks(context: HTMLElement | Document = document): Promise<string[]> {
+    const containers = context.querySelectorAll('.fb-dash-form-element');
     const questions: string[] = [];
     const defaultFields = await getDefaultFields();
 
@@ -1567,8 +1605,8 @@ async function getDefaultFields(): Promise<any> {
     });
 }
 
-async function performRadioButtonChecks(answers: Record<string, string>) {
-    const fieldsets = document.querySelectorAll('fieldset');
+async function performRadioButtonChecks(answers: Record<string, string>, context: HTMLElement | Document = document) {
+    const fieldsets = context.querySelectorAll('fieldset');
     for (const fieldset of Array.from(fieldsets)) {
         const legend = fieldset.querySelector('legend');
         const questionText = legend?.querySelector('span[aria-hidden="true"]')?.textContent?.trim() || legend?.textContent?.trim() || '';
@@ -1594,8 +1632,8 @@ async function performRadioButtonChecks(answers: Record<string, string>) {
     }
 }
 
-async function gatherRadioButtonChecks(): Promise<string[]> {
-    const fieldsets = document.querySelectorAll('fieldset');
+async function gatherRadioButtonChecks(context: HTMLElement | Document = document): Promise<string[]> {
+    const fieldsets = context.querySelectorAll('fieldset');
     const questions: string[] = [];
     for (const fieldset of Array.from(fieldsets)) {
         const radios = Array.from(fieldset.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
@@ -1618,8 +1656,8 @@ async function gatherRadioButtonChecks(): Promise<string[]> {
     return questions;
 }
 
-async function performDropdownChecks(answers: Record<string, string>) {
-    const selects = document.querySelectorAll('select');
+async function performDropdownChecks(answers: Record<string, string>, context: HTMLElement | Document = document) {
+    const selects = context.querySelectorAll('select');
     for (const select of Array.from(selects) as HTMLSelectElement[]) {
         const container = select.closest('.fb-dash-form-element') || select.parentElement;
         const label = container?.querySelector('label');
@@ -1644,8 +1682,8 @@ async function performDropdownChecks(answers: Record<string, string>) {
     }
 }
 
-async function gatherDropdownChecks(): Promise<string[]> {
-    const selects = document.querySelectorAll('select');
+async function gatherDropdownChecks(context: HTMLElement | Document = document): Promise<string[]> {
+    const selects = context.querySelectorAll('select');
     const questions: string[] = [];
     for (const select of Array.from(selects) as HTMLSelectElement[]) {
         const container = select.closest('.fb-dash-form-element') || select.parentElement;

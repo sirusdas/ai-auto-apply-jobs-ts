@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AISettings, AIProvider } from '../../types';
 import ModelSelector from './ModelSelector';
+import { fetchProviderModels, getBestDefaultModel } from '../../utils/modelFetcher';
 
 const AIProviderSettings: React.FC = () => {
   const [settings, setSettings] = useState<AISettings>({
@@ -11,10 +12,14 @@ const AIProviderSettings: React.FC = () => {
     ],
     primaryProvider: 'gemini',
     enableFallback: false,
-    timeout: 30000
+    timeout: 30000,
+    maxRetries: 3,
+    pauseAfterRetries: false,
+    pauseDuration: 30
   });
 
   const [status, setStatus] = useState<{ type: string; message: string } | null>(null);
+  const [isVerifying, setIsVerifying] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     chrome.storage.local.get(['aiSettings'], (result) => {
@@ -40,6 +45,71 @@ const AIProviderSettings: React.FC = () => {
       p.id === id ? { ...p, [field]: value } : p
     );
     setSettings({ ...settings, providers: updatedProviders });
+  };
+
+  const handleApiKeyBlur = async (providerId: string, apiKey: string) => {
+    if (!apiKey) return;
+    
+    setIsVerifying(prev => ({ ...prev, [providerId]: true }));
+    setStatus({ type: 'info', message: `Verifying ${providerId} API key and fetching models...` });
+
+    try {
+      const provider = settings.providers.find(p => p.id === providerId);
+      if (!provider) return;
+      const providerWithKey = { ...provider, apiKey };
+      
+      const models = await fetchProviderModels(providerWithKey);
+      if (models && models.length > 0) {
+        const bestModelId = getBestDefaultModel(models, providerId);
+        
+        // Update both the api key (already updated via onChange but we ensure it) and the model
+        const updatedProviders = settings.providers.map(p => {
+          if (p.id === providerId) {
+            return { ...p, apiKey, model: bestModelId };
+          }
+          return p;
+        });
+        
+        setSettings(prev => ({ ...prev, providers: updatedProviders }));
+        setStatus({ type: 'success', message: `Verified! Auto-selected best model: ${bestModelId}` });
+      } else {
+        setStatus({ type: 'warning', message: `Could not fetch models for ${providerId}. Check API key.` });
+      }
+    } catch (error) {
+      console.error(`Error verifying ${providerId} key:`, error);
+      setStatus({ type: 'error', message: `Verification failed for ${providerId}. Check API key.` });
+    } finally {
+      setIsVerifying(prev => ({ ...prev, [providerId]: false }));
+      setTimeout(() => setStatus(null), 4000);
+    }
+  };
+
+  const handleAddCustomProvider = () => {
+    const newId = `custom-${Date.now()}`;
+    setSettings({
+      ...settings,
+      providers: [
+        ...settings.providers,
+        {
+          id: newId,
+          name: 'Custom Provider (OpenRouter/Local)',
+          enabled: true,
+          apiKey: '',
+          model: '',
+          priority: settings.providers.length + 1,
+          isCustom: true,
+          baseUrl: 'https://openrouter.ai/api/v1'
+        }
+      ]
+    });
+  };
+
+  const handleRemoveCustomProvider = (id: string) => {
+    setSettings({
+      ...settings,
+      providers: settings.providers.filter(p => p.id !== id),
+      primaryProvider: settings.primaryProvider === id ? 'gemini' : settings.primaryProvider
+    });
   };
 
   const handleSave = () => {
@@ -87,6 +157,104 @@ const AIProviderSettings: React.FC = () => {
             Enable Automatic Fallback (Try other enabled providers if primary fails)
           </label>
         </div>
+
+        <div className="form-group">
+          <label htmlFor="max-retries">Max AI Retries Before Action:</label>
+          <input
+            type="number"
+            id="max-retries"
+            value={settings.maxRetries ?? 3}
+            onChange={(e) => setSettings({ ...settings, maxRetries: parseInt(e.target.value) || 3 })}
+            min="1"
+          />
+        </div>
+
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.tryOtherFreeModels ?? true}
+              onChange={(e) => setSettings({ ...settings, tryOtherFreeModels: e.target.checked })}
+            />
+            Try other free models if max retries limit is hit
+          </label>
+        </div>
+
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.pauseAfterRetries ?? false}
+              onChange={(e) => setSettings({ ...settings, pauseAfterRetries: e.target.checked })}
+            />
+            Pause and Resume Instead of Stopping after Max Retries
+          </label>
+        </div>
+
+        {(settings.pauseAfterRetries ?? false) && (
+          <div className="form-group">
+            <label htmlFor="pause-duration">Pause Duration (minutes):</label>
+            <input
+              type="number"
+              id="pause-duration"
+              value={settings.pauseDuration ?? 30}
+              onChange={(e) => setSettings({ ...settings, pauseDuration: parseInt(e.target.value) || 30 })}
+              min="1"
+            />
+          </div>
+        )}
+
+        <hr style={{ margin: '20px 0', border: '0', borderTop: '1px solid #eee' }} />
+        <h4>JD Compression Optimization (Save Tokens)</h4>
+        
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.enableJdCompression ?? false}
+              onChange={(e) => setSettings({ ...settings, enableJdCompression: e.target.checked })}
+            />
+            Enable Job Description Compression (Highly Recommended)
+          </label>
+        </div>
+
+        {(settings.enableJdCompression) && (
+          <>
+            <div className="form-group">
+              <label htmlFor="compression-method">Compression Method:</label>
+              <select
+                id="compression-method"
+                value={settings.jdCompressionMethod || 'regex'}
+                onChange={(e) => setSettings({ ...settings, jdCompressionMethod: e.target.value as any })}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              >
+                <option value="regex">Fast Regex Trimming (Removes EEO/Benefits boilerplate - 0s delay)</option>
+                <option value="local_ai">Local Chrome AI (window.ai - 100% Free & Fast)</option>
+                <option value="cheap_api">Cheap API (Use a fast/cheap secondary AI to compress)</option>
+              </select>
+            </div>
+            
+            {(settings.jdCompressionMethod === 'cheap_api') && (
+              <div className="form-group">
+                <label htmlFor="compression-provider">Secondary Provider for Compression:</label>
+                <select
+                  id="compression-provider"
+                  value={settings.jdCompressionProviderId || ''}
+                  onChange={(e) => setSettings({ ...settings, jdCompressionProviderId: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                >
+                  <option value="">-- Select Provider --</option>
+                  {settings.providers.filter(p => p.enabled).map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.model || 'Default'})</option>
+                  ))}
+                </select>
+                <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                  Select a very cheap or free provider (like Gemini Flash or a Local LLM) to do the compression before sending to your primary expensive model.
+                </small>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="providers-list">
@@ -139,8 +307,11 @@ const AIProviderSettings: React.FC = () => {
                     id={`${provider.id}-api-key`}
                     value={provider.apiKey}
                     onChange={(e) => handleProviderChange(provider.id, 'apiKey', e.target.value)}
+                    onBlur={(e) => handleApiKeyBlur(provider.id, e.target.value)}
                     placeholder={`Enter ${provider.name} API Key`}
+                    disabled={isVerifying[provider.id]}
                   />
+                  {isVerifying[provider.id] && <span className="verifying-text">Verifying...</span>}
                 </div>
                 <div className="form-group">
                   <label htmlFor={`${provider.id}-model`}>Model:</label>
@@ -161,10 +332,51 @@ const AIProviderSettings: React.FC = () => {
                     min="1"
                   />
                 </div>
+                {provider.isCustom && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor={`${provider.id}-name`}>Provider Name:</label>
+                      <input
+                        type="text"
+                        id={`${provider.id}-name`}
+                        value={provider.name}
+                        onChange={(e) => handleProviderChange(provider.id, 'name', e.target.value)}
+                        placeholder="e.g. OpenRouter, LM Studio"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor={`${provider.id}-baseUrl`}>Base URL (OpenAI-compatible):</label>
+                      <input
+                        type="text"
+                        id={`${provider.id}-baseUrl`}
+                        value={provider.baseUrl || ''}
+                        onChange={(e) => handleProviderChange(provider.id, 'baseUrl', e.target.value)}
+                        placeholder="e.g. https://openrouter.ai/api/v1 or http://localhost:11434/v1"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => handleRemoveCustomProvider(provider.id)}
+                      className="btn-remove"
+                      style={{ marginTop: '10px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Remove Provider
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
         ))}
+        
+        <div style={{ marginTop: '15px', textAlign: 'center' }}>
+          <button 
+            onClick={handleAddCustomProvider}
+            className="btn-secondary"
+            style={{ padding: '8px 16px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer', fontWeight: 500 }}
+          >
+            + Add Custom Provider (OpenRouter, Local LLMs, etc)
+          </button>
+        </div>
       </div>
 
       <div className="notice-card card warning-notice">
@@ -351,6 +563,24 @@ const AIProviderSettings: React.FC = () => {
         .status-message.success {
           background-color: #dcfce7;
           color: #166534;
+        }
+        .status-message.info {
+          background-color: #e0f2fe;
+          color: #0369a1;
+        }
+        .status-message.error {
+          background-color: #fee2e2;
+          color: #b91c1c;
+        }
+        .status-message.warning {
+          background-color: #fef08a;
+          color: #854d0e;
+        }
+        .verifying-text {
+          font-size: 0.8em;
+          color: #2196F3;
+          margin-left: 8px;
+          font-style: italic;
         }
       `}} />
     </div>

@@ -7,13 +7,19 @@ export class OpenAIProvider implements IAIProvider {
 
     constructor(private config: AIProvider) { }
 
-    async sendRequest(prompt: string): Promise<AIResponse> {
+    async sendRequest(prompt: string, systemPrompt?: string): Promise<AIResponse> {
         const apiKey = this.config.apiKey;
         const model = this.config.model || 'gpt-4o';
 
         if (!apiKey) {
             throw new Error('OpenAI API key not configured.');
         }
+        
+        const messages: any[] = [];
+        if (systemPrompt) {
+            messages.push({ role: 'system', content: systemPrompt });
+        }
+        messages.push({ role: 'user', content: prompt });
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -23,7 +29,7 @@ export class OpenAIProvider implements IAIProvider {
             },
             body: JSON.stringify({
                 model: model,
-                messages: [{ role: 'user', content: prompt }]
+                messages: messages
             })
         });
 
